@@ -309,7 +309,41 @@ def main():
         if success:
             print("   ✅ File content updated successfully")
 
-    # Test 10: Delete Project (cleanup)
+    # Test 10: Task Management Tests
+    created_task_id = None
+    if tester.created_project_id:
+        # Test list tasks (should be empty initially)
+        success, tasks = tester.test_list_tasks(tester.created_project_id)
+        if success:
+            print(f"   Found {len(tasks)} initial tasks")
+
+        # Test create task
+        success, task_data = tester.test_create_task(
+            tester.created_project_id,
+            "Deploy MVP",
+            status="todo",
+            priority="high", 
+            quadrant="q1"
+        )
+        if success and 'id' in task_data:
+            created_task_id = task_data['id']
+            print(f"   Created task ID: {created_task_id}")
+            print(f"   Task status: {task_data.get('status')}")
+            print(f"   Task priority: {task_data.get('priority')}")
+            print(f"   Task quadrant: {task_data.get('quadrant')}")
+
+        # Test update task status
+        if created_task_id:
+            success, updated_task = tester.test_update_task(created_task_id, {"status": "in-progress"})
+            if success:
+                print(f"   ✅ Task status updated to: {updated_task.get('status')}")
+
+        # Test list tasks again (should have 1 task)
+        success, tasks = tester.test_list_tasks(tester.created_project_id)
+        if success:
+            print(f"   Found {len(tasks)} tasks after creation")
+
+    # Test 11: Delete Project (cleanup)
     if tester.created_project_id:
         success, _ = tester.test_delete_project(tester.created_project_id)
         if success:
