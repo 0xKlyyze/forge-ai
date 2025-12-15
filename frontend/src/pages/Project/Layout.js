@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Home, 
   FileText, 
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Outlet, useLocation, useNavigate, useParams, NavLink } from 'react-router-dom';
 import api from '../../utils/api';
+import ColorThief from 'colorthief';
 
 const MainNavLink = ({ to, label, icon: Icon }) => (
     <NavLink
@@ -29,6 +30,7 @@ export default function ProjectLayout() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
       const fetchProject = async () => {
@@ -40,6 +42,40 @@ export default function ProjectLayout() {
       fetchProject();
   }, [projectId]);
 
+  // Dynamic Theme Logic
+  useEffect(() => {
+      if (project?.icon && containerRef.current) {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.src = project.icon;
+          
+          img.onload = () => {
+              try {
+                  const colorThief = new ColorThief();
+                  const color = colorThief.getColor(img);
+                  const [r, g, b] = color;
+                  
+                  // Convert RGB to HSL for Tailwind
+                  const { h, s, l } = rgbToHsl(r, g, b);
+                  
+                  // Update CSS Variables
+                  const root = document.documentElement;
+                  root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
+                  root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
+                  
+                  // Add a subtle gradient background to the layout
+                  containerRef.current.style.background = `
+                      radial-gradient(circle at top left, rgba(${r}, ${g}, ${b}, 0.15), transparent 40%),
+                      radial-gradient(circle at bottom right, rgba(${r}, ${g}, ${b}, 0.1), transparent 40%),
+                      #09090b
+                  `;
+              } catch (e) {
+                  console.error("Color extraction failed", e);
+              }
+          };
+      }
+  }, [project?.icon]);
+
   const mainNavItems = [
     { to: `/project/${projectId}/home`, label: 'Home', icon: Home },
     { to: `/project/${projectId}/files`, label: 'Artifacts', icon: FileText },
@@ -48,12 +84,12 @@ export default function ProjectLayout() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-background flex antialiased overflow-hidden relative">
+    <div ref={containerRef} className="h-screen w-screen bg-background flex antialiased overflow-hidden relative transition-colors duration-700">
         
         {/* Navigation Sidebar */}
-        <nav className="w-28 flex-shrink-0 flex flex-col items-center py-6 gap-6 bg-background border-r border-border/40 z-20">
+        <nav className="w-28 flex-shrink-0 flex flex-col items-center py-6 gap-6 border-r border-border/10 z-20 bg-background/50 backdrop-blur-xl">
             {/* 1. App Icon */}
-            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 mb-2 cursor-pointer overflow-hidden" onClick={() => navigate('/dashboard')}>
+            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 mb-2 cursor-pointer overflow-hidden transition-transform hover:scale-105" onClick={() => navigate('/dashboard')}>
                 {project?.icon ? (
                     <img src={project.icon} alt="Project Icon" className="w-full h-full object-cover" />
                 ) : (
@@ -91,8 +127,8 @@ export default function ProjectLayout() {
         </nav>
         
         {/* Main content wrapper */}
-        <div className="flex-1 min-w-0 h-screen p-3 bg-background">
-            <main className="h-full w-full bg-secondary/10 flex flex-col relative overflow-hidden rounded-2xl border border-white/5 shadow-2xl backdrop-blur-3xl">
+        <div className="flex-1 min-w-0 h-screen p-3">
+            <main className="h-full w-full bg-black/40 flex flex-col relative overflow-hidden rounded-2xl border border-white/5 shadow-2xl backdrop-blur-md">
                 <div className="flex-1 overflow-y-auto">
                     <Outlet />
                 </div>
@@ -100,4 +136,27 @@ export default function ProjectLayout() {
         </div>
     </div>
   );
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+
+  if (max === min) {
+    h = s = 0; // achromatic
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
