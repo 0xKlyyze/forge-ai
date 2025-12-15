@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Body
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from database import db
-from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse, TaskModel, TaskResponse
+from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse, TaskModel, TaskResponse, ChatSessionModel, ChatSessionResponse, ChatSessionListResponse
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
 from typing import List
-from chat import generate_response
+from chat import generate_response, get_available_models
 from bson import ObjectId
 import os
 
@@ -411,3 +412,197 @@ async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_c
     except Exception as e:
         print(f"Gemini Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- AI MODELS ---
+
+@app.get("/api/models")
+async def get_models():
+    """Get available AI model presets"""
+    return get_available_models()
+
+# --- CHAT SESSIONS ---
+
+@app.get("/api/projects/{project_id}/chat-sessions", response_model=List[ChatSessionListResponse])
+async def list_chat_sessions(project_id: str, current_user: dict = Depends(get_current_user)):
+    """List all chat sessions for a project"""
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    sessions = []
+    cursor = db.chat_sessions.find({"project_id": project_id}).sort("updated_at", -1)
+    async for s in cursor:
+        sessions.append(ChatSessionListResponse(
+            id=str(s["_id"]),
+            project_id=s["project_id"],
+            title=s.get("title", "New Chat"),
+            message_count=len(s.get("messages", [])),
+            created_at=s["created_at"],
+            updated_at=s["updated_at"]
+        ))
+    return sessions
+
+@app.post("/api/projects/{project_id}/chat-sessions", response_model=ChatSessionResponse)
+async def create_chat_session(project_id: str, current_user: dict = Depends(get_current_user)):
+    """Create a new chat session"""
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    new_session = {
+        "project_id": project_id,
+        "title": "New Chat",
+        "messages": [
+            {"role": "model", "content": "I'm Forge AI. I can help you with architecture, code, or planning. Type '@' to reference specific files.", "timestamp": datetime.now().isoformat()}
+        ],
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+    }
+    
+    result = await db.chat_sessions.insert_one(new_session)
+    new_session["_id"] = result.inserted_id
+    
+    return ChatSessionResponse(
+        id=str(result.inserted_id),
+        project_id=project_id,
+        title=new_session["title"],
+        messages=new_session["messages"],
+        created_at=new_session["created_at"],
+        updated_at=new_session["updated_at"]
+    )
+
+@app.get("/api/chat-sessions/{session_id}", response_model=ChatSessionResponse)
+async def get_chat_session(session_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a chat session with all messages"""
+    session = await db.chat_sessions.find_one({"_id": ObjectId(session_id)})
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    # Verify user owns the project
+    project = await db.projects.find_one({"_id": ObjectId(session["project_id"]), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    return ChatSessionResponse(
+        id=str(session["_id"]),
+        project_id=session["project_id"],
+        title=session.get("title", "New Chat"),
+        messages=session.get("messages", []),
+        created_at=session["created_at"],
+        updated_at=session["updated_at"]
+    )
+
+class ChatMessageRequest(BaseModel):
+    message: str
+    context_mode: str = "selective"
+    referenced_files: List[str] = []
+    web_search: bool = False
+    model_preset: str = "fast"  # powerful, fast, or efficient
+
+@app.post("/api/chat-sessions/{session_id}/messages")
+async def add_message_to_session(session_id: str, request: ChatMessageRequest, current_user: dict = Depends(get_current_user)):
+    """Add a message to a session and get AI response"""
+    session = await db.chat_sessions.find_one({"_id": ObjectId(session_id)})
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    project = await db.projects.find_one({"_id": ObjectId(session["project_id"]), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Add user message
+    user_msg = {"role": "user", "content": request.message, "timestamp": datetime.now().isoformat()}
+    
+    # Gather context
+    context_files = []
+    context_tasks = []
+    
+    if request.context_mode == 'all':
+        cursor_f = db.files.find({"project_id": session["project_id"]})
+        async for f in cursor_f:
+            context_files.append(f)
+        cursor_t = db.tasks.find({"project_id": session["project_id"]})
+        async for t in cursor_t:
+            context_tasks.append(t)
+    elif request.referenced_files:
+        object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
+        cursor_f = db.files.find({"_id": {"$in": object_ids}})
+        async for f in cursor_f:
+            context_files.append(f)
+    
+    project_context = {
+        "name": project["name"],
+        "status": project.get("status", "planning"),
+        "files": context_files,
+        "tasks": context_tasks
+    }
+    
+    # Get existing messages for history
+    history = session.get("messages", [])
+    
+    try:
+        response = await generate_response(
+            history=history,
+            message=request.message,
+            project_context=project_context,
+            web_search=request.web_search,
+            model_preset=request.model_preset
+        )
+        
+        ai_msg = {"role": "model", "content": response["text"], "timestamp": datetime.now().isoformat()}
+        
+        # Update session with new messages
+        await db.chat_sessions.update_one(
+            {"_id": ObjectId(session_id)},
+            {
+                "$push": {"messages": {"$each": [user_msg, ai_msg]}},
+                "$set": {"updated_at": datetime.now()}
+            }
+        )
+        
+        # Auto-generate title from first user message if still "New Chat"
+        if session.get("title") == "New Chat" and len(history) <= 1:
+            # Use first ~50 chars of user message as title
+            auto_title = request.message[:50] + ("..." if len(request.message) > 50 else "")
+            await db.chat_sessions.update_one(
+                {"_id": ObjectId(session_id)},
+                {"$set": {"title": auto_title}}
+            )
+        
+        return {"user_message": user_msg, "ai_message": ai_msg}
+        
+    except Exception as e:
+        print(f"Gemini Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/chat-sessions/{session_id}")
+async def update_chat_session(session_id: str, updates: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Update chat session (e.g., title)"""
+    session = await db.chat_sessions.find_one({"_id": ObjectId(session_id)})
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    project = await db.projects.find_one({"_id": ObjectId(session["project_id"]), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    allowed = ["title"]
+    filtered_updates = {k: v for k, v in updates.items() if k in allowed}
+    filtered_updates["updated_at"] = datetime.now()
+    
+    await db.chat_sessions.update_one({"_id": ObjectId(session_id)}, {"$set": filtered_updates})
+    return {"detail": "Session updated"}
+
+@app.delete("/api/chat-sessions/{session_id}")
+async def delete_chat_session(session_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a chat session"""
+    session = await db.chat_sessions.find_one({"_id": ObjectId(session_id)})
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    project = await db.projects.find_one({"_id": ObjectId(session["project_id"]), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    await db.chat_sessions.delete_one({"_id": ObjectId(session_id)})
+    return {"detail": "Session deleted"}

@@ -1,18 +1,54 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
+import logging
+import traceback
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+# Initialize client
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel('gemini-2.0-flash-exp')
+# Model presets - user-friendly names mapped to actual model IDs
+MODEL_PRESETS = {
+    "powerful": {
+        "id": "gemini-3-pro-preview",
+        "name": "Powerful",
+        "description": "Best reasoning & complex tasks",
+        "icon": "brain"
+    },
+    "fast": {
+        "id": "gemini-flash-latest",
+        "name": "Fast",
+        "description": "Balanced speed & quality",
+        "icon": "zap"
+    },
+    "efficient": {
+        "id": "gemini-flash-lite-latest",
+        "name": "Efficient",
+        "description": "Quick responses, lower cost",
+        "icon": "leaf"
+    }
+}
+
+def get_available_models():
+    """Return the available model presets"""
+    return MODEL_PRESETS
+
+def get_model_id(preset: str) -> str:
+    """Get the actual model ID from a preset name"""
+    if preset in MODEL_PRESETS:
+        return MODEL_PRESETS[preset]["id"]
+    # Default to fast if invalid preset
+    return MODEL_PRESETS["fast"]["id"]
 
 async def generate_response(
     history: list,
     message: str,
     project_context: dict,
-    web_search: bool = False
+    web_search: bool = False,
+    model_preset: str = "fast"
 ):
     system_instruction = f"""
     You are Forge AI, an expert software architect and coding assistant.
@@ -35,39 +71,44 @@ async def generate_response(
     - If web search is enabled, use it to find up-to-date information.
     """
 
+    # Convert history
     chat_history = []
-    # Convert history format if needed (Gemini uses role: 'user'/'model')
     for msg in history:
         role = 'user' if msg['role'] == 'user' else 'model'
-        chat_history.append({'role': role, 'parts': [msg['content']]})
+        chat_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg['content'])]))
 
-    # Add system instruction as the first part of the context or just prepend it to the first message?
-    # Gemini SDK supports system_instruction at model init, but we initialized globally.
-    # We can start a chat with history.
+    # Configure tools
+    tools = []
+    if web_search:
+        tools.append(types.Tool(google_search=types.GoogleSearch()))
+
+    # Get the actual model ID from preset
+    model_id = get_model_id(model_preset)
     
-    # Actually, let's prepend system instruction to the context or as a separate 'user' message that sets the stage if history is empty.
-    # Or better, use the `system_instruction` param if we re-init model (expensive?).
-    # Let's just create a new model instance for this turn if we want system prompts, or just include it in the prompt.
-    
-    # We'll use a fresh chat session for each request (stateless backend) passing full history.
-    
-    tools = 'google_search_retrieval' if web_search else None
-    
-    # Re-init model to inject system prompt cleanly
-    session_model = genai.GenerativeModel(
-        'gemini-2.0-flash-exp',
-        system_instruction=system_instruction,
-        tools=tools
-    )
-    
-    chat = session_model.start_chat(history=chat_history)
-    
-    response = await chat.send_message_async(message)
-    
-    return {
-        "text": response.text,
-        "sources": [] # Extract if available in response.candidates[0].grounding_metadata
-    }
+    print(f"DEBUG: Using model: {model_id} (preset: {model_preset})")
+    print(f"DEBUG: Tools config: {tools}")
+
+    try:
+        # Generate content
+        response = await client.aio.models.generate_content(
+            model=model_id,
+            contents=chat_history + [types.Content(role='user', parts=[types.Part.from_text(text=message)])],
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=tools
+            )
+        )
+        
+        return {
+            "text": response.text,
+            "sources": [],
+            "model_used": model_id
+        }
+
+    except Exception as e:
+        print("DEBUG: Detailed traceback:")
+        traceback.print_exc()
+        raise e
 
 def _format_files(files):
     if not files: return "No files referenced."
@@ -76,3 +117,5 @@ def _format_files(files):
 def _format_tasks(tasks):
     if not tasks: return "No tasks."
     return "\n".join([f"- [{t['status']}] {t['title']} (Priority: {t['priority']})" for t in tasks])
+
+

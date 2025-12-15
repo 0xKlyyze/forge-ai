@@ -1,0 +1,196 @@
+// /project-root/src/components/Layout/FramedAppLayout.jsx
+// /project-root/src/components/Layout/FramedAppLayout.jsx
+import React, { useState, useEffect } from 'react';
+import logo from '../../brand/logo.png';
+import { NavLink } from 'react-router-dom';
+import { useSettings } from '../../contexts/SettingsContext';
+import {
+    Palette, Plus, BookOpen, Home, Layers, BookOpen as ReadIcon, BookCopy as VocabIcon,
+    BarChart3 as StatsIcon, Settings, User, Minus, Square, X, Sun, Moon, // Icons for the new theme toggle
+    // Window control icons remain
+    // Import other icons like FileText, BookMarked if needed for specific nav items here
+} from 'lucide-react';
+import { useFocusMode } from '../../contexts/FocusModeContext';
+// ADD: Import the bubble container
+import AiStatusBubbleContainer from '../ReadingInterfaceView/popups/AiStatusBubble';
+// ... other imports
+
+
+const WindowControls = ({ isVisible }) => {
+    const handleMinimize = () => window.electronAPI?.minimize();
+    const handleMaximize = () => window.electronAPI?.toggleMaximize();
+    const handleClose = () => window.electronAPI?.close();
+
+    return (
+        <div className={`
+      absolute top-0 left-0 right-0 h-12 flex items-center justify-end px-4 z-50
+      transition-all duration-300 ease-in-out
+      ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}
+      bg-gradient-to-b from-surface/80 to-transparent
+    `}>
+            <div className="flex space-x-2">
+                <button
+                    onClick={handleMinimize}
+                    className="w-8 h-8 rounded-full bg-semantic-warning/80 hover:bg-semantic-warning flex items-center justify-center transition-colors"
+                    title="Minimize"
+                >
+                    <Minus size={14} className="text-text" />
+                </button>
+                <button
+                    onClick={handleMaximize}
+                    className="w-8 h-8 rounded-full bg-semantic-success/80 hover:bg-semantic-success flex items-center justify-center transition-colors"
+                    title="Maximize"
+                >
+                    <Square size={12} className="text-text" />
+                </button>
+                <button
+                    onClick={handleClose}
+                    className="w-8 h-8 rounded-full bg-semantic-error/80 hover:bg-semantic-error flex items-center justify-center transition-colors"
+                    title="Close"
+                >
+                    <X size={14} className="text-text" />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// NEW: Main navigation link component
+const MainNavLink = ({ to, label, icon: Icon }) => (
+    <NavLink
+        to={to}
+        className={({ isActive }) => `
+            flex flex-col items-center justify-center gap-2 w-20 h-20 rounded-2xl 
+            transition-all duration-200 group
+            ${isActive ? 'bg-primary text-background' : 'text-text-medium hover:bg-primary/10 hover:text-primary'}
+        `}
+    >
+        <Icon size={28} strokeWidth={1.75} />
+        <span className="text-xs font-medium">{label}</span>
+    </NavLink>
+);
+
+// NEW: Theme toggle button
+const ThemeToggle = () => {
+    const { settings, setSetting } = useSettings();
+    const isDarkMode = settings.theme === 'dark';
+
+    // Add/remove 'dark' class from the root <html> element
+    useEffect(() => {
+        const root = window.document.documentElement;
+        root.classList.remove(isDarkMode ? 'light' : 'dark');
+        root.classList.add(settings.theme);
+    }, [settings.theme]);
+
+    const toggleTheme = () => {
+        setSetting('theme', isDarkMode ? 'light' : 'dark');
+    };
+
+    return (
+        <button
+            onClick={toggleTheme}
+            title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+            className="p-3 bg-background rounded-xl border border-ui-border text-text-medium hover:bg-primary/10 hover:text-primary transition-colors"
+        >
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+    );
+};
+
+const FramedAppLayout = ({ children }) => {
+    // Example: Active state might be managed by NavLink or a global context in a real app
+    // For now, NavLink's isActive will handle most cases.
+    // const [activeNav, setActiveNav] = useState('read'); // Remove if NavLink handles it
+    const { isFocusMode } = useFocusMode();
+    const [showControls, setShowControls] = useState(false);
+    const [mouseY, setMouseY] = useState(0);
+
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            setMouseY(e.clientY);
+            // Show controls when mouse is within 50px of top
+            setShowControls(e.clientY <= 50);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    const mainNavItems = [
+        { to: '/dashboard', label: 'Home', icon: Home },
+        { to: '/library', label: 'Read', icon: BookOpen },
+        { to: '/vocabulary', label: 'Learn', icon: Layers },
+    ];
+
+    const navItemsBottom = [
+        { id: 'settings', path: '/settings', label: 'Settings', icon: Settings },
+    ];
+
+    return (
+        <div className="h-screen w-screen bg-background flex antialiased overflow-hidden relative">
+            <WindowControls isVisible={showControls} />
+
+            {/* NEW Navigation Layout */}
+            <nav className={`
+        w-28 flex-shrink-0 flex-col items-center py-6 gap-4
+        transition-all duration-300 ease-in-out
+        ${isFocusMode ? 'hidden' : 'flex'}
+      `}>
+                {/* 1. App Icon */}
+                <img src={logo} alt="Yomimaru App Icon" className="w-14 h-14" />
+
+                {/* 2. Primary Action */}
+                <NavLink
+                    to="/import"
+                    title="Import New Text"
+                    className="p-4 bg-background rounded-full hover:bg-primary/10  border border-ui-border text-text-medium hover:text-primary transition-colors duration-200 shadow-lg hover:shadow-xl"
+
+                >
+                    <Plus size={24} strokeWidth={2} />
+                </NavLink>
+
+                {/* 3. Main Navigation */}
+                <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                    {mainNavItems.map(item => (
+                        <MainNavLink key={item.to} {...item} />
+                    ))}
+                </div>
+
+                {/* 4. Utilities */}
+                <div className="flex flex-col items-center gap-4">
+                    <ThemeToggle />
+                    <NavLink
+                        to="/settings"
+                        title="Settings"
+                        className={({ isActive }) => `
+                            p-3 rounded-xl transition-colors
+                            ${isActive ? 'bg-primary/20 text-primary' : 'bg-background border border-ui-border text-text-medium hover:bg-primary/10 hover:text-primary'}
+                        `}
+                    >
+                        <Settings size={20} />
+                    </NavLink>
+                </div>
+            </nav>
+
+            {/* Main content wrapper (unchanged from last refactor) */}
+            <div className={`
+        flex-1 min-w-0 h-screen
+        transition-all duration-300 ease-in-out
+        ${isFocusMode ? 'p-0' : 'p-2'}
+      `}>
+                <main className={`
+          h-full w-full bg-surface flex flex-col relative overflow-hidden
+          transition-all duration-300 ease-in-out
+          ${isFocusMode ? 'rounded-none shadow-none' : 'rounded-xl shadow-md'}
+        `}>
+                    <div className="flex-1 overflow-y-auto">
+                        {children}
+                    </div>
+                </main>
+            </div>
+        </div>
+    );
+};
+
+export default FramedAppLayout;

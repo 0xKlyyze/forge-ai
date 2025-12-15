@@ -102,3 +102,33 @@ class TaskResponse(BaseModel):
     linked_files: List[str]
     due_date: Optional[datetime]
     created_at: datetime
+
+# Chat Session Models
+class ChatMessageModel(BaseModel):
+    role: str  # 'user' or 'model'
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+class ChatSessionModel(BaseModel):
+    id: Optional[str] = Field(default=None, alias="_id")
+    project_id: str
+    title: str = "New Chat"
+    messages: List[dict] = []  # List of {role, content, timestamp}
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+class ChatSessionResponse(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    messages: List[dict]
+    created_at: datetime
+    updated_at: datetime
+
+class ChatSessionListResponse(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    message_count: int
+    created_at: datetime
+    updated_at: datetime
