@@ -5,8 +5,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-// Placeholder for Workspace
-const Workspace = () => <div className="p-10 text-white">Workspace Loading...</div>;
+import Workspace from './pages/Workspace';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
