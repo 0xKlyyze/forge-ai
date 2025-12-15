@@ -99,6 +99,7 @@ async def create_project(project: ProjectModel, current_user: dict = Depends(get
         status=created_project.get("status", "planning"),
         tags=created_project.get("tags", []),
         links=created_project.get("links", []),
+        icon=created_project.get("icon", ""),
         created_at=created_project["created_at"],
         last_edited=created_project["last_edited"]
     )
