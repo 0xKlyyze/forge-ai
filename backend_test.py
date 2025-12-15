@@ -179,6 +179,54 @@ class ForgeAPITester:
         )
         return success, response
 
+    def test_list_tasks(self, project_id):
+        """List tasks in project"""
+        success, response = self.run_test(
+            "List Project Tasks",
+            "GET",
+            f"api/projects/{project_id}/tasks",
+            200
+        )
+        return success, response
+
+    def test_create_task(self, project_id, title, status="todo", priority="high", quadrant="q1"):
+        """Create a task in project"""
+        success, response = self.run_test(
+            "Create Task",
+            "POST",
+            "api/tasks",
+            200,
+            data={
+                "project_id": project_id,
+                "title": title,
+                "status": status,
+                "priority": priority,
+                "quadrant": quadrant
+            }
+        )
+        return success, response
+
+    def test_update_task(self, task_id, updates):
+        """Update task"""
+        success, response = self.run_test(
+            "Update Task",
+            "PUT",
+            f"api/tasks/{task_id}",
+            200,
+            data=updates
+        )
+        return success, response
+
+    def test_delete_task(self, task_id):
+        """Delete a task"""
+        success, response = self.run_test(
+            "Delete Task",
+            "DELETE",
+            f"api/tasks/{task_id}",
+            200
+        )
+        return success, response
+
 def main():
     # Setup
     tester = ForgeAPITester()
