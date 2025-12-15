@@ -5,6 +5,7 @@ from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileM
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
 from typing import List
+from chat import generate_response
 from bson import ObjectId
 import os
 
