@@ -44,6 +44,7 @@ class FileModel(BaseModel):
     content: str = ""
     priority: int = 5 # 1-10, 10 is highest
     created_at: datetime = Field(default_factory=datetime.now)
+    pinned: bool = False
     last_edited: datetime = Field(default_factory=datetime.now)
 
 class TaskModel(BaseModel):
