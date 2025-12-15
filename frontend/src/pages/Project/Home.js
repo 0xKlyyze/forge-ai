@@ -1,151 +1,259 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Progress } from '../../components/ui/progress';
-import { FileText, Clock, AlertCircle, CheckCircle2, File, Activity, Star } from 'lucide-react';
+import { 
+  FileText, Clock, Activity, Star, 
+  CheckCircle2, Plus, ArrowRight, Zap,
+  Code, Image as ImageIcon
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ScrollArea } from '../../components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import { Input } from '../../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { toast } from 'sonner';
 
 export default function ProjectHome() {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const [project, setProject] = useState(null);
-  const [stats, setStats] = useState({ fileCount: 0, taskCount: 0, completedTasks: 0, highPriorityFiles: [] });
+  const [stats, setStats] = useState({ fileCount: 0, taskCount: 0, completedTasks: 0, highPriorityFiles: [], nextTask: null });
   const [recentActivity, setRecentActivity] = useState([]);
+  
+  // Quick Action State
+  const [isActionOpen, setIsActionOpen] = useState(false);
+  const [quickTaskTitle, setQuickTaskTitle] = useState('');
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [projRes, filesRes, tasksRes] = await Promise.all([
-          api.get(`/projects/${projectId}`),
-          api.get(`/projects/${projectId}/files`),
-          api.get(`/projects/${projectId}/tasks`)
-        ]);
-
-        setProject(projRes.data);
-        
-        const files = filesRes.data;
-        const tasks = tasksRes.data;
-        
-        const highPriFiles = files.filter(f => f.priority >= 8).slice(0, 5);
-        
-        setStats({
-          fileCount: files.length,
-          taskCount: tasks.length,
-          completedTasks: tasks.filter(t => t.status === 'done').length,
-          highPriorityFiles: highPriFiles
-        });
-        
-        // Mock recent activity based on last edits (simple)
-        const activity = [
-           ...files.map(f => ({ type: 'file', item: f, date: f.last_edited })),
-           ...tasks.map(t => ({ type: 'task', item: t, date: t.created_at }))
-        ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
-        
-        setRecentActivity(activity);
-
-      } catch (error) {
-        console.error("Failed to load project home data", error);
-      }
-    };
     loadData();
   }, [projectId]);
 
-  if (!project) return <div className="p-8">Loading control room...</div>;
+  const loadData = async () => {
+    try {
+      const [projRes, filesRes, tasksRes] = await Promise.all([
+        api.get(`/projects/${projectId}`),
+        api.get(`/projects/${projectId}/files`),
+        api.get(`/projects/${projectId}/tasks`)
+      ]);
 
-  const progress = stats.taskCount > 0 ? (stats.completedTasks / stats.taskCount) * 100 : 0;
+      setProject(projRes.data);
+      const files = filesRes.data;
+      const tasks = tasksRes.data;
+      
+      // Logic for "Next Task" (Highest priority, todo)
+      const nextTask = tasks
+        .filter(t => t.status === 'todo')
+        .sort((a, b) => {
+            const prioMap = { high: 3, medium: 2, low: 1 };
+            if (prioMap[b.priority] !== prioMap[a.priority]) return prioMap[b.priority] - prioMap[a.priority];
+            return 0; // could add creation date sort
+        })[0];
+
+      setStats({
+        fileCount: files.length,
+        taskCount: tasks.length,
+        completedTasks: tasks.filter(t => t.status === 'done').length,
+        highPriorityFiles: files.filter(f => f.pinned),
+        nextTask
+      });
+      
+      const activity = [
+         ...files.map(f => ({ type: 'file', item: f, date: f.last_edited })),
+         ...tasks.map(t => ({ type: 'task', item: t, date: t.created_at }))
+      ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+      setRecentActivity(activity);
+
+    } catch (error) {
+      console.error("Failed to load project home data", error);
+    }
+  };
+
+  const handleQuickTask = async (e) => {
+      e.preventDefault();
+      try {
+          await api.post('/tasks', {
+              project_id: projectId,
+              title: quickTaskTitle,
+              priority: 'medium',
+              importance: 'medium',
+              status: 'todo',
+              quadrant: 'q2'
+          });
+          toast.success("Task added");
+          setQuickTaskTitle('');
+          setIsActionOpen(false);
+          loadData();
+      } catch (error) {
+          toast.error("Failed");
+      }
+  };
+
+  if (!project) return <div className="p-8 flex items-center justify-center h-full"><div className="animate-pulse text-muted-foreground">Initializing Control Room...</div></div>;
+
+  const completionRate = stats.taskCount > 0 ? (stats.completedTasks / stats.taskCount) * 100 : 0;
 
   return (
-    <div className="p-6 lg:p-10 h-full overflow-auto bg-background/50">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="relative h-full flex flex-col overflow-hidden bg-background/50">
+      <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-8 pb-24">
         
         {/* Header */}
-        <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-mono font-bold tracking-tighter uppercase">{project.name} <span className="text-muted-foreground text-lg ml-2 font-normal normal-case">// Dashboard</span></h1>
-            <p className="text-muted-foreground max-w-2xl">Project status: <span className="text-primary uppercase font-bold">{project.status}</span>. Last active {formatDistanceToNow(new Date(project.last_edited), { addSuffix: true })}.</p>
+        <div className="flex flex-col gap-1">
+            <h2 className="text-xs font-mono text-primary uppercase tracking-widest mb-2">Project Dashboard</h2>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-foreground uppercase">{project.name}</h1>
+            <p className="text-muted-foreground max-w-xl">
+                Status: <span className="text-foreground font-medium">{project.status}</span> • Last active {formatDistanceToNow(new Date(project.last_edited))} ago.
+            </p>
         </div>
 
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-auto gap-4">
-            
-            {/* 1. Status & Progress (Large) */}
-            <Card className="md:col-span-2 row-span-1 bg-secondary/20 border-white/5 backdrop-blur-xl">
-                <CardHeader>
-                    <CardTitle className="text-lg font-mono flex items-center gap-2"><Activity className="h-4 w-4 text-primary"/> PROJECT VELOCITY</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex justify-between text-sm text-muted-foreground mb-1">
-                        <span>Task Completion</span>
-                        <span>{Math.round(progress)}%</span>
+        {/* Hero: Focus Mode */}
+        {stats.nextTask ? (
+            <div className="w-full bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/20 rounded-3xl p-8 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <Zap className="h-24 w-24 text-primary/10 rotate-12" />
+                </div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Current Focus</span>
+                        <span className="text-xs text-primary font-mono uppercase">High Priority</span>
                     </div>
-                    <Progress value={progress} className="h-2" />
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div className="bg-white/5 p-4 rounded-lg">
-                            <div className="text-3xl font-bold font-mono">{stats.taskCount}</div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wider">Total Tasks</div>
-                        </div>
-                        <div className="bg-white/5 p-4 rounded-lg">
-                            <div className="text-3xl font-bold font-mono">{stats.fileCount}</div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wider">Artifacts</div>
-                        </div>
+                    <h3 className="text-3xl font-bold mb-2">{stats.nextTask.title}</h3>
+                    <p className="text-muted-foreground mb-6 max-w-2xl">{stats.nextTask.description || "No description provided. Execute immediately."}</p>
+                    <div className="flex gap-3">
+                        <Button size="lg" className="rounded-full font-bold" onClick={() => navigate(`/project/${projectId}/tasks`)}>
+                            Start Mission <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                        <Button size="lg" variant="secondary" className="rounded-full" onClick={async () => {
+                            await api.put(`/tasks/${stats.nextTask.id}`, { status: 'done' });
+                            toast.success("Objective Complete");
+                            loadData();
+                        }}>
+                            Mark Complete
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        ) : (
+            <div className="w-full bg-secondary/10 border border-white/5 rounded-3xl p-8 flex items-center justify-center flex-col text-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
+                <h3 className="text-2xl font-bold">All Clear</h3>
+                <p className="text-muted-foreground">No pending high-priority tasks. Initialize new directives.</p>
+            </div>
+        )}
+
+        {/* Grid Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Stats */}
+            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm">
+                <CardContent className="p-6">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4"/> Velocity</h4>
+                    <div className="text-4xl font-mono font-bold mb-2">{Math.round(completionRate)}%</div>
+                    <Progress value={completionRate} className="h-2 mb-4" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{stats.completedTasks} Complete</span>
+                        <span>{stats.taskCount} Total</span>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* 2. Source of Truth (Med) */}
-            <Card className="md:col-span-2 row-span-1 bg-secondary/10 border-white/5">
-                 <CardHeader>
-                    <CardTitle className="text-lg font-mono flex items-center gap-2"><Star className="h-4 w-4 text-accent"/> SOURCE OF TRUTH</CardTitle>
-                    <CardDescription>High priority documentation.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-2">
-                        {stats.highPriorityFiles.map(file => (
-                            <div key={file.id} className="flex items-center justify-between p-2 rounded bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border-l-2 border-accent">
-                                <span className="text-sm font-medium flex items-center gap-2"><FileText className="h-3 w-3 text-muted-foreground"/> {file.name}</span>
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-accent/20 text-accent font-mono">P{file.priority}</span>
-                            </div>
-                        ))}
-                         {stats.highPriorityFiles.length === 0 && <div className="text-sm text-muted-foreground italic">No high priority docs found.</div>}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* 3. Recent Activity (Tall) */}
-            <Card className="md:col-span-1 md:row-span-2 bg-secondary/5 border-white/5">
-                <CardHeader>
-                    <CardTitle className="text-lg font-mono flex items-center gap-2"><Clock className="h-4 w-4"/> FEED</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <ScrollArea className="h-[400px] px-6">
-                        <div className="space-y-6 border-l border-white/10 ml-2 pl-4 py-2">
-                            {recentActivity.map((act, i) => (
-                                <div key={i} className="relative">
-                                    <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-secondary border border-white/10" />
-                                    <p className="text-sm font-medium">{act.type === 'file' ? 'Edited file' : 'Updated task'}</p>
-                                    <p className="text-xs text-muted-foreground truncate w-full">{act.item.name || act.item.title}</p>
-                                    <p className="text-[10px] text-muted-foreground/50 mt-1">{formatDistanceToNow(new Date(act.date))} ago</p>
+            {/* Pinned Files */}
+            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm md:col-span-2">
+                <CardContent className="p-6">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500"/> Pinned Artifacts</h4>
+                    <div className="flex gap-4 overflow-x-auto pb-2">
+                        {stats.highPriorityFiles.length > 0 ? (
+                            stats.highPriorityFiles.map(file => (
+                                <div 
+                                    key={file.id} 
+                                    onClick={() => navigate(`/project/${projectId}/editor/${file.id}`)}
+                                    className="flex-shrink-0 w-48 p-4 bg-background/50 rounded-xl border border-white/5 hover:border-primary/50 cursor-pointer transition-all hover:-translate-y-1"
+                                >
+                                    {file.type === 'mockup' ? <Code className="h-6 w-6 text-blue-400 mb-2"/> : <FileText className="h-6 w-6 text-zinc-400 mb-2"/>}
+                                    <p className="font-bold text-sm truncate">{file.name}</p>
+                                    <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(file.last_edited))} ago</p>
                                 </div>
-                            ))}
+                            ))
+                        ) : (
+                            <div className="text-sm text-muted-foreground italic">No artifacts pinned.</div>
+                        )}
+                        <div 
+                            onClick={() => navigate(`/project/${projectId}/files`)}
+                            className="flex-shrink-0 w-12 flex items-center justify-center bg-secondary/20 rounded-xl border border-white/5 cursor-pointer hover:bg-secondary/40"
+                        >
+                            <ArrowRight className="h-4 w-4" />
                         </div>
-                    </ScrollArea>
+                    </div>
                 </CardContent>
             </Card>
-
-             {/* 4. Quick Actions */}
-             <Card className="md:col-span-1 bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border-white/10">
-                 <CardContent className="flex flex-col items-center justify-center h-full p-6 space-y-4">
-                     <Button className="w-full font-mono" variant="secondary">New Task</Button>
-                     <Button className="w-full font-mono" variant="outline">Upload Asset</Button>
-                 </CardContent>
-             </Card>
-
-             {/* 5. Placeholder for future widget */}
-             <Card className="md:col-span-2 bg-black/40 border-dashed border-white/10 flex items-center justify-center">
-                 <div className="text-muted-foreground text-sm font-mono">System Widget Offline</div>
-             </Card>
         </div>
+
+        {/* Activity Feed */}
+        <div className="space-y-4">
+            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Recent Transmissions</h4>
+            <div className="space-y-2">
+                {recentActivity.map((act, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-secondary/5 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-4">
+                            <div className={`h-2 w-2 rounded-full ${act.type === 'task' ? 'bg-green-500' : 'bg-blue-500'}`} />
+                            <div>
+                                <p className="font-medium text-sm">{act.item.name || act.item.title}</p>
+                                <p className="text-xs text-muted-foreground">{act.type === 'task' ? 'Directive Updated' : 'Artifact Modified'}</p>
+                            </div>
+                        </div>
+                        <span className="text-xs font-mono text-muted-foreground">{formatDistanceToNow(new Date(act.date))} ago</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+      </div>
+
+      {/* Floating Action Dock */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
+              <Dialog open={isActionOpen} onOpenChange={setIsActionOpen}>
+                  <DialogTrigger asChild>
+                      <Button size="icon" className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 w-12 shadow-lg shadow-primary/20">
+                          <Plus className="h-6 w-6" />
+                      </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                      <DialogHeader>
+                          <DialogTitle>Quick Action</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid grid-cols-2 gap-4 py-4">
+                          <div className="col-span-2 space-y-4">
+                              <h4 className="text-sm font-medium">New Directive</h4>
+                              <form onSubmit={handleQuickTask} className="flex gap-2">
+                                  <Input placeholder="What needs to be done?" value={quickTaskTitle} onChange={e => setQuickTaskTitle(e.target.value)} required />
+                                  <Button type="submit">Add</Button>
+                              </form>
+                          </div>
+                          <div className="col-span-2 h-px bg-white/10 my-2" />
+                          <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => navigate(`/project/${projectId}/files`)}>
+                              <FileText className="h-6 w-6" />
+                              New Document
+                          </Button>
+                          <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => navigate(`/project/${projectId}/files`)}>
+                              <Code className="h-6 w-6" />
+                              New Mockup
+                          </Button>
+                      </div>
+                  </DialogContent>
+              </Dialog>
+              
+              <div className="w-px h-8 bg-white/10 mx-2" />
+              
+              <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/project/${projectId}/files`)}>
+                  <FileText className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/project/${projectId}/editor`)}>
+                  <Code className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/project/${projectId}/tasks`)}>
+                  <CheckCircle2 className="h-5 w-5" />
+              </Button>
+          </div>
       </div>
     </div>
   );
