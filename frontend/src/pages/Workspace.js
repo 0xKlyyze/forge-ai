@@ -43,32 +43,11 @@ export default function Workspace() {
   };
 
   const handleCreateFile = async (name, type, category) => {
-    try {
-      const res = await api.post('/files', {
-        project_id: projectId,
-        name,
-        type,
-        category,
-        content: type === 'mockup' ? 'export default function Component() {\n  return <div>New Component</div>\n}' : '# New File'
-      });
-      setFiles([...files, res.data]);
-      setActiveFile(res.data);
-      toast.success("File created");
-    } catch (error) {
-      toast.error("Failed to create file");
-    }
+    // Moved to ProjectFiles.js
   };
 
   const handleDeleteFile = async (fileId) => {
-    if (!window.confirm("Delete this file?")) return;
-    try {
-      await api.delete(`/files/${fileId}`);
-      setFiles(files.filter(f => f.id !== fileId));
-      if (activeFile && activeFile.id === fileId) setActiveFile(null);
-      toast.success("File deleted");
-    } catch (error) {
-      toast.error("Failed to delete file");
-    }
+     // Moved to ProjectFiles.js
   };
 
   // Debounced save
