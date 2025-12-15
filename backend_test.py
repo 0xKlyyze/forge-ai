@@ -230,7 +230,7 @@ class ForgeAPITester:
 def main():
     # Setup
     tester = ForgeAPITester()
-    test_email = f"test@example.com"
+    test_email = f"test_{datetime.now().strftime('%H%M%S')}@example.com"
     test_password = "password123"
     
     print("🚀 Starting Forge API Tests")
