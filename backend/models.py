@@ -34,7 +34,6 @@ class ProjectModel(BaseModel):
     tags: List[str] = []
     created_at: datetime = Field(default_factory=datetime.now)
     last_edited: datetime = Field(default_factory=datetime.now)
-    difficulty: str = "medium" # low, medium, high
 
 class FileModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
