@@ -136,6 +136,29 @@ async def delete_project(project_id: str, current_user: dict = Depends(get_curre
     result = await db.projects.delete_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Project not found")
+@app.put("/api/projects/{project_id}", response_model=ProjectResponse)
+async def update_project(project_id: str, updates: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    existing_project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not existing_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    allowed = ["name", "status", "tags", "links"]
+    filtered_updates = {k: v for k, v in updates.items() if k in allowed}
+    filtered_updates["last_edited"] = datetime.now()
+    
+    await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": filtered_updates})
+    
+    updated_project = await db.projects.find_one({"_id": ObjectId(project_id)})
+    return ProjectResponse(
+        id=str(updated_project["_id"]),
+        name=updated_project["name"],
+        status=updated_project.get("status", "planning"),
+        tags=updated_project.get("tags", []),
+        links=updated_project.get("links", []),
+        created_at=updated_project["created_at"],
+        last_edited=updated_project["last_edited"]
+    )
+
     # Delete associated files and tasks
     await db.files.delete_many({"project_id": project_id})
     await db.tasks.delete_many({"project_id": project_id})
