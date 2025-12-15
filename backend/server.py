@@ -292,7 +292,7 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
         raise HTTPException(status_code=404, detail="Project not found")
         
     # Allowed fields to update
-    allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "difficulty"]
+    allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "importance"]
     update_data = {k: v for k, v in task_update.items() if k in allowed_keys}
     
     await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update_data})
@@ -306,7 +306,7 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
         status=updated_task.get("status", "todo"),
         priority=updated_task.get("priority", "medium"),
         quadrant=updated_task.get("quadrant", "q2"),
-        difficulty=updated_task.get("difficulty", "medium"),
+        importance=updated_task.get("importance", "medium"),
         linked_files=updated_task.get("linked_files", []),
         due_date=updated_task.get("due_date"),
         created_at=updated_task["created_at"]
