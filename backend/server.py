@@ -219,6 +219,7 @@ async def update_file(file_id: str, file_update: dict = Body(...), current_user:
         category=updated_file["category"],
         content=updated_file.get("content", ""),
         priority=updated_file.get("priority", 5),
+        pinned=updated_file.get("pinned", False),
         last_edited=updated_file["last_edited"]
     )
 
