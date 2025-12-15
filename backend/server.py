@@ -6,7 +6,7 @@ from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileM
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
 from typing import List
-from chat import generate_response, get_available_models
+from chat import generate_response, get_available_models, edit_selection
 from bson import ObjectId
 import os
 
@@ -102,6 +102,7 @@ async def create_project(project: ProjectModel, current_user: dict = Depends(get
         tags=created_project.get("tags", []),
         links=created_project.get("links", []),
         icon=created_project.get("icon", ""),
+        custom_categories=created_project.get("custom_categories", []),
         created_at=created_project["created_at"],
         last_edited=created_project["last_edited"]
     )
@@ -149,12 +150,24 @@ async def update_project(project_id: str, updates: dict = Body(...), current_use
     existing_project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
     if not existing_project:
         raise HTTPException(status_code=404, detail="Project not found")
-        
-    allowed = ["name", "status", "tags", "links", "icon"]
+    print(f"DEBUG: update_project {project_id} received updates: {updates}")
+    allowed = ["name", "status", "tags", "links", "icon", "custom_categories"]
     filtered_updates = {k: v for k, v in updates.items() if k in allowed}
+    print(f"DEBUG: update_project {project_id} filtered updates: {filtered_updates}")
+    
+    if "custom_categories" in filtered_updates:
+        print(f"DEBUG: Update contains custom_categories. Current DB state for project {project_id}:")
+        current_proj = await db.projects.find_one({"_id": ObjectId(project_id)})
+        print(f"DEBUG: Current custom_categories: {current_proj.get('custom_categories', [])}")
+
     filtered_updates["last_edited"] = datetime.now()
     
-    await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": filtered_updates})
+    result = await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": filtered_updates})
+    print(f"DEBUG: update_one result: matched={result.matched_count}, modified={result.modified_count}")
+    
+    if "custom_categories" in filtered_updates:
+        updated_proj = await db.projects.find_one({"_id": ObjectId(project_id)})
+        print(f"DEBUG: POST-UPDATE custom_categories: {updated_proj.get('custom_categories', [])}")
     
     updated_project = await db.projects.find_one({"_id": ObjectId(project_id)})
     return ProjectResponse(
@@ -164,6 +177,7 @@ async def update_project(project_id: str, updates: dict = Body(...), current_use
         tags=updated_project.get("tags", []),
         links=updated_project.get("links", []),
         icon=updated_project.get("icon", ""),
+        custom_categories=updated_project.get("custom_categories", []),
         created_at=updated_project["created_at"],
         last_edited=updated_project["last_edited"]
     )
@@ -191,6 +205,7 @@ async def list_files(project_id: str, current_user: dict = Depends(get_current_u
             category=f["category"],
             content=f.get("content", ""),
             priority=f.get("priority", 5),
+            tags=f.get("tags", []),
             pinned=f.get("pinned", False),
             last_edited=f["last_edited"]
         ))
@@ -234,7 +249,7 @@ async def update_file(file_id: str, file_update: dict = Body(...), current_user:
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    update_data = {k: v for k, v in file_update.items() if k in ["name", "content", "category", "type", "priority", "pinned"]}
+    update_data = {k: v for k, v in file_update.items() if k in ["name", "content", "category", "type", "priority", "pinned", "tags"]}
     update_data["last_edited"] = datetime.now()
     
     await db.files.update_one({"_id": ObjectId(file_id)}, {"$set": update_data})
@@ -253,6 +268,7 @@ async def update_file(file_id: str, file_update: dict = Body(...), current_user:
         category=updated_file["category"],
         content=updated_file.get("content", ""),
         priority=updated_file.get("priority", 5),
+        tags=updated_file.get("tags", []),
         pinned=updated_file.get("pinned", False),
         last_edited=updated_file["last_edited"]
     )
@@ -413,6 +429,138 @@ async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_c
         print(f"Gemini Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- DASHBOARD ---
+
+class DashboardResponse(BaseModel):
+    projects: List[dict]
+    recent_conversations: List[dict]
+    priority_tasks: List[dict]
+
+@app.get("/api/dashboard", response_model=DashboardResponse)
+async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
+    """Get aggregated data for dashboard widgets"""
+    
+    # 1. Get projects with file/task counts
+    projects = []
+    cursor = db.projects.find({"user_id": current_user["id"]}).sort("last_edited", -1)
+    async for project in cursor:
+        project_id = str(project["_id"])
+        
+        # Count files and tasks
+        file_count = await db.files.count_documents({"project_id": project_id})
+        task_count = await db.tasks.count_documents({"project_id": project_id})
+        completed_tasks = await db.tasks.count_documents({"project_id": project_id, "status": "done"})
+        
+        projects.append({
+            "id": project_id,
+            "name": project["name"],
+            "status": project.get("status", "planning"),
+            "icon": project.get("icon", ""),
+            "file_count": file_count,
+            "task_count": task_count,
+            "completed_tasks": completed_tasks,
+            "last_edited": project["last_edited"].isoformat() if project.get("last_edited") else None,
+            "created_at": project["created_at"].isoformat() if project.get("created_at") else None
+        })
+    
+    # 2. Get recent conversations across all projects
+    recent_conversations = []
+    project_ids = [p["id"] for p in projects]
+    
+    if project_ids:
+        cursor = db.chat_sessions.find({"project_id": {"$in": project_ids}}).sort("updated_at", -1).limit(5)
+        async for session in cursor:
+            # Get project name
+            project_name = next((p["name"] for p in projects if p["id"] == session["project_id"]), "Unknown")
+            
+            recent_conversations.append({
+                "id": str(session["_id"]),
+                "project_id": session["project_id"],
+                "project_name": project_name,
+                "title": session.get("title", "New Chat"),
+                "message_count": len(session.get("messages", [])),
+                "updated_at": session["updated_at"].isoformat() if session.get("updated_at") else None
+            })
+    
+    # 3. Get priority tasks (Q1 - urgent & important, or high priority not done)
+    priority_tasks = []
+    if project_ids:
+        cursor = db.tasks.find({
+            "project_id": {"$in": project_ids},
+            "status": {"$ne": "done"},
+            "$or": [
+                {"quadrant": "q1"},
+                {"priority": "high", "importance": "high"}
+            ]
+        }).sort("created_at", -1).limit(10)
+        
+        async for task in cursor:
+            project_name = next((p["name"] for p in projects if p["id"] == task["project_id"]), "Unknown")
+            
+            priority_tasks.append({
+                "id": str(task["_id"]),
+                "project_id": task["project_id"],
+                "project_name": project_name,
+                "title": task["title"],
+                "priority": task.get("priority", "medium"),
+                "importance": task.get("importance", "medium"),
+                "quadrant": task.get("quadrant", "q2"),
+                "status": task.get("status", "todo")
+            })
+    
+    return DashboardResponse(
+        projects=projects,
+        recent_conversations=recent_conversations,
+        priority_tasks=priority_tasks
+    )
+
+@app.get("/api/projects/{project_id}/dashboard")
+async def get_project_dashboard(project_id: str, current_user: dict = Depends(get_current_user)):
+    """Get dashboard data for a specific project (for Project Home widgets)"""
+    
+    # Verify project ownership
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get priority tasks (Q1 - urgent & important, not done)
+    priority_tasks = []
+    cursor = db.tasks.find({
+        "project_id": project_id,
+        "status": {"$ne": "done"},
+        "$or": [
+            {"quadrant": "q1"},
+            {"priority": "high", "importance": "high"}
+        ]
+    }).sort("created_at", -1).limit(5)
+    
+    async for task in cursor:
+        priority_tasks.append({
+            "id": str(task["_id"]),
+            "title": task["title"],
+            "priority": task.get("priority", "medium"),
+            "importance": task.get("importance", "medium"),
+            "quadrant": task.get("quadrant", "q2"),
+            "status": task.get("status", "todo")
+        })
+    
+    # Get recent chat sessions for this project
+    recent_chats = []
+    cursor = db.chat_sessions.find({"project_id": project_id}).sort("updated_at", -1).limit(5)
+    
+    async for session in cursor:
+        recent_chats.append({
+            "id": str(session["_id"]),
+            "title": session.get("title", "New Chat"),
+            "message_count": len(session.get("messages", [])),
+            "updated_at": session["updated_at"].isoformat() if session.get("updated_at") else None
+        })
+    
+    return {
+        "priority_tasks": priority_tasks,
+        "recent_chats": recent_chats
+    }
+
 # --- AI MODELS ---
 
 @app.get("/api/models")
@@ -430,13 +578,15 @@ async def list_chat_sessions(project_id: str, current_user: dict = Depends(get_c
         raise HTTPException(status_code=404, detail="Project not found")
     
     sessions = []
-    cursor = db.chat_sessions.find({"project_id": project_id}).sort("updated_at", -1)
+    # Sort by pinned first, then by updated_at
+    cursor = db.chat_sessions.find({"project_id": project_id}).sort([("pinned", -1), ("updated_at", -1)])
     async for s in cursor:
         sessions.append(ChatSessionListResponse(
             id=str(s["_id"]),
             project_id=s["project_id"],
             title=s.get("title", "New Chat"),
             message_count=len(s.get("messages", [])),
+            pinned=s.get("pinned", False),
             created_at=s["created_at"],
             updated_at=s["updated_at"]
         ))
@@ -577,7 +727,7 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
 
 @app.put("/api/chat-sessions/{session_id}")
 async def update_chat_session(session_id: str, updates: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    """Update chat session (e.g., title)"""
+    """Update chat session (e.g., title, pinned)"""
     session = await db.chat_sessions.find_one({"_id": ObjectId(session_id)})
     if not session:
         raise HTTPException(status_code=404, detail="Chat session not found")
@@ -586,7 +736,7 @@ async def update_chat_session(session_id: str, updates: dict = Body(...), curren
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    allowed = ["title"]
+    allowed = ["title", "pinned"]
     filtered_updates = {k: v for k, v in updates.items() if k in allowed}
     filtered_updates["updated_at"] = datetime.now()
     
@@ -606,3 +756,26 @@ async def delete_chat_session(session_id: str, current_user: dict = Depends(get_
     
     await db.chat_sessions.delete_one({"_id": ObjectId(session_id)})
     return {"detail": "Session deleted"}
+
+# --- AI EDIT SELECTION ---
+class EditSelectionRequest(BaseModel):
+    selection: str
+    context_before: str
+    context_after: str
+    instruction: str
+    file_type: str = "javascript"
+
+@app.post("/api/ai/edit-selection")
+async def ai_edit_selection(request: EditSelectionRequest, current_user: dict = Depends(get_current_user)):
+    """Edit a selected portion of code using AI"""
+    try:
+        edited_content = await edit_selection(
+            selection=request.selection,
+            context_before=request.context_before,
+            context_after=request.context_after,
+            instruction=request.instruction,
+            file_type=request.file_type
+        )
+        return {"edited_content": edited_content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

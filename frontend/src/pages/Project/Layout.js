@@ -110,7 +110,7 @@ export default function ProjectLayout() {
         { to: `/project/${projectId}/chat`, label: 'Advisor', icon: Sparkles },
         { to: `/project/${projectId}/files`, label: 'Artifacts', icon: FileText },
         { to: `/project/${projectId}/editor`, label: 'Editor', icon: Code },
-        { to: `/project/${projectId}/tasks`, label: 'Mission', icon: CheckSquare },
+        { to: `/project/${projectId}/tasks`, label: 'Tasks', icon: CheckSquare },
     ];
 
     return (

@@ -35,7 +35,7 @@ class ProjectModel(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     icon: str = "" # Base64 image
     links: List[dict] = [] # [{'title': 'AI Studio', 'url': '...', 'type': 'ai-studio'}]
-    links: List[dict] = [] # [{'title': 'AI Studio', 'url': '...'}]
+    custom_categories: List[dict] = []
     last_edited: datetime = Field(default_factory=datetime.now)
 
 class FileModel(BaseModel):
@@ -46,6 +46,7 @@ class FileModel(BaseModel):
     category: str 
     content: str = ""
     priority: int = 5 # 1-10, 10 is highest
+    tags: List[str] = []  # User-defined tags
     created_at: datetime = Field(default_factory=datetime.now)
     pinned: bool = False
     last_edited: datetime = Field(default_factory=datetime.now)
@@ -75,7 +76,7 @@ class ProjectResponse(BaseModel):
     links: List[dict] = []
     status: str
     tags: List[str] = []
-    links: List[dict] = []
+    custom_categories: List[dict] = []
     created_at: datetime
     last_edited: datetime
 
@@ -87,6 +88,7 @@ class FileResponse(BaseModel):
     category: str
     content: str
     priority: int
+    tags: List[str] = []
     pinned: bool = False
     last_edited: datetime
 
@@ -114,6 +116,7 @@ class ChatSessionModel(BaseModel):
     project_id: str
     title: str = "New Chat"
     messages: List[dict] = []  # List of {role, content, timestamp}
+    pinned: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -122,6 +125,7 @@ class ChatSessionResponse(BaseModel):
     project_id: str
     title: str
     messages: List[dict]
+    pinned: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -130,5 +134,6 @@ class ChatSessionListResponse(BaseModel):
     project_id: str
     title: str
     message_count: int
+    pinned: bool = False
     created_at: datetime
     updated_at: datetime

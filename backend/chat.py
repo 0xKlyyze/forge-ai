@@ -119,3 +119,65 @@ def _format_tasks(tasks):
     return "\n".join([f"- [{t['status']}] {t['title']} (Priority: {t['priority']})" for t in tasks])
 
 
+async def edit_selection(
+    selection: str,
+    context_before: str,
+    context_after: str,
+    instruction: str,
+    file_type: str = "javascript"
+):
+    """Edit a selected portion of code based on user instruction"""
+    system_instruction = f"""
+    You are an expert code editor. The user has selected a portion of code and wants you to modify it.
+    
+    RULES:
+    - Return ONLY the edited code, no explanations or markdown formatting
+    - Maintain the same indentation style as the original
+    - Keep the code style consistent with the surrounding context
+    - If the instruction is unclear, make reasonable assumptions
+    - For the file type: {file_type}
+    
+    CONTEXT BEFORE SELECTION:
+    ```
+    {context_before[-1500:]}
+    ```
+    
+    SELECTED TEXT TO EDIT:
+    ```
+    {selection}
+    ```
+    
+    CONTEXT AFTER SELECTION:
+    ```
+    {context_after[:1500]}
+    ```
+    """
+    
+    try:
+        response = await client.aio.models.generate_content(
+            model="gemini-flash-latest",
+            contents=[types.Content(role='user', parts=[types.Part.from_text(
+                text=f"Edit the selected code according to this instruction: {instruction}\n\nReturn only the edited code, nothing else."
+            )])],
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction
+            )
+        )
+        
+        # Clean up response - remove markdown code blocks if present
+        result = response.text.strip()
+        if result.startswith("```"):
+            lines = result.split("\n")
+            # Remove first and last lines (code block markers)
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            result = "\n".join(lines)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Edit selection error: {e}")
+        traceback.print_exc()
+        raise e
