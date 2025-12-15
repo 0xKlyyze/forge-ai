@@ -170,7 +170,6 @@ async def create_file(file: FileModel, current_user: dict = Depends(get_current_
         raise HTTPException(status_code=404, detail="Project not found")
         
     new_file = file.dict(exclude={"id"})
-            pinned=f.get("pinned", False),
     new_file["created_at"] = datetime.now()
     new_file["last_edited"] = datetime.now()
     
