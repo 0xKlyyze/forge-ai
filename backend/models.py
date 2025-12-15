@@ -71,6 +71,8 @@ class UserResponse(BaseModel):
 class ProjectResponse(BaseModel):
     id: str
     name: str
+    icon: str = ""
+    links: List[dict] = []
     status: str
     tags: List[str] = []
     links: List[dict] = []
