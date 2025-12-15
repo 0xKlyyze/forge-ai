@@ -11,10 +11,10 @@ import Workspace from './pages/Workspace';
 import ProjectTasks from './pages/Project/Tasks';
 import ProjectFiles from './pages/Project/Files';
 import ProjectSettings from './pages/Project/Settings'; // Import Settings
+import ProjectChat from './pages/Project/Chat';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
-import ProjectChat from './pages/Project/Chat';
   const location = useLocation();
 
   if (loading) return <div className="text-white">Loading...</div>;
