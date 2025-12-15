@@ -5,6 +5,7 @@ import {
   CheckSquare, 
   Settings, 
   Code,
+  Sparkles,
   Plus,
   LogOut
 } from 'lucide-react';
