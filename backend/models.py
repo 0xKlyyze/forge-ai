@@ -61,7 +61,6 @@ class TaskModel(BaseModel):
 
 # Response Models
 class UserResponse(BaseModel):
-    difficulty: str
     id: str
     email: str
 
