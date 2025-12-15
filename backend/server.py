@@ -324,6 +324,60 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
     project = await db.projects.find_one({"_id": ObjectId(existing_task["project_id"]), "user_id": current_user["id"]})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+# --- CHAT ---
+class ChatRequest(BaseModel):
+    message: str
+    history: List[dict] = [] # [{'role': 'user', 'content': 'hi'}]
+    project_id: str
+    context_mode: str = "selective" # 'all' or 'selective'
+    referenced_files: List[str] = [] # List of file IDs
+    web_search: bool = False
+
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_current_user)):
+    # Verify project access
+    project = await db.projects.find_one({"_id": ObjectId(request.project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Gather Context
+    context_files = []
+    context_tasks = []
+    
+    if request.context_mode == 'all':
+        cursor_f = db.files.find({"project_id": request.project_id})
+        async for f in cursor_f:
+            context_files.append(f)
+        cursor_t = db.tasks.find({"project_id": request.project_id})
+        async for t in cursor_t:
+            context_tasks.append(t)
+    elif request.referenced_files:
+        # Fetch specific files
+        object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
+        cursor_f = db.files.find({"_id": {"$in": object_ids}})
+        async for f in cursor_f:
+            context_files.append(f)
+            
+    # Always include basic project info
+    project_context = {
+        "name": project["name"],
+        "status": project.get("status", "planning"),
+        "files": context_files,
+        "tasks": context_tasks
+    }
+    
+    try:
+        response = await generate_response(
+            history=request.history,
+            message=request.message,
+            project_context=project_context,
+            web_search=request.web_search
+        )
+        return response
+    except Exception as e:
+        print(f"Gemini Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
         
     # Allowed fields to update
     allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "importance"]
