@@ -14,6 +14,7 @@ import ProjectSettings from './pages/Project/Settings'; // Import Settings
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
+import ProjectChat from './pages/Project/Chat';
   const location = useLocation();
 
   if (loading) return <div className="text-white">Loading...</div>;
