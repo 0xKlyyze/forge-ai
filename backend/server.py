@@ -288,7 +288,6 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
         raise HTTPException(status_code=404, detail="Task not found")
         
     project = await db.projects.find_one({"_id": ObjectId(existing_task["project_id"]), "user_id": current_user["id"]})
-            difficulty=t.get("difficulty", "medium"),
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         
