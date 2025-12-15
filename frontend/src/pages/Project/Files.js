@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { Button } from '../../components/ui/button';
@@ -7,11 +7,12 @@ import { Card, CardContent, CardFooter } from '../../components/ui/card';
 import { 
   FileText, Code, Image as ImageIcon, File, 
   MoreVertical, ExternalLink, Search, Plus, 
-  LayoutGrid, List as ListIcon, Trash2, Eye 
+  LayoutGrid, List as ListIcon, Trash2, Eye, Upload, Download
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -22,9 +23,15 @@ export default function ProjectFiles() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('grid');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filterType, setFilterType] = useState('All');
+  
+  // Creation State
   const [newFileName, setNewFileName] = useState('');
   const [newFileCategory, setNewFileCategory] = useState('Docs');
-  const [filterType, setFilterType] = useState('All');
+  
+  // Upload State
+  const [uploadFile, setUploadFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   const [previewFile, setPreviewFile] = useState(null);
 
@@ -48,25 +55,61 @@ export default function ProjectFiles() {
     if (newFileCategory === 'Assets') type = 'asset';
     
     let name = newFileName;
-    if (type === 'doc' && !name.endsWith('.md')) name += '.md';
-    if (type === 'mockup' && !name.endsWith('.jsx')) name += '.jsx';
+    // Auto-append extension only for blank files
+    if (!uploadFile) {
+        if (type === 'doc' && !name.endsWith('.md')) name += '.md';
+        if (type === 'mockup' && !name.endsWith('.jsx')) name += '.jsx';
+    }
 
-    try {
-      const res = await api.post('/files', {
-        project_id: projectId,
-        name,
-        type,
-        category: newFileCategory,
-        content: type === 'mockup' ? 'export default function Component() {\n  return <div>New Component</div>\n}' : '# New File'
-      });
-      setFiles([res.data, ...files]);
-      setNewFileName('');
-      setIsDialogOpen(false);
-      toast.success("Artifact created");
-    } catch (error) {
-      toast.error("Creation failed");
+    let content = '# New File';
+    if (type === 'mockup') content = 'export default function Component() {\n  return <div>New Component</div>\n}';
+
+    // Handle Upload
+    if (uploadFile) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const result = e.target.result;
+            await submitFile(name, type, newFileCategory, result);
+        };
+        // Detect text vs binary
+        const isText = uploadFile.type.startsWith('text/') || 
+                       uploadFile.name.endsWith('.js') || 
+                       uploadFile.name.endsWith('.jsx') || 
+                       uploadFile.name.endsWith('.ts') || 
+                       uploadFile.name.endsWith('.tsx') || 
+                       uploadFile.name.endsWith('.md') ||
+                       uploadFile.name.endsWith('.json') ||
+                       uploadFile.name.endsWith('.css') ||
+                       uploadFile.name.endsWith('.html');
+        
+        if (isText) {
+            reader.readAsText(uploadFile);
+        } else {
+            reader.readAsDataURL(uploadFile);
+        }
+    } else {
+        await submitFile(name, type, newFileCategory, content);
     }
   };
+
+  const submitFile = async (name, type, category, content) => {
+      try {
+        const res = await api.post('/files', {
+            project_id: projectId,
+            name,
+            type,
+            category,
+            content
+        });
+        setFiles([res.data, ...files]);
+        setNewFileName('');
+        setUploadFile(null);
+        setIsDialogOpen(false);
+        toast.success("Artifact created");
+      } catch (error) {
+        toast.error("Creation failed");
+      }
+  }
 
   const handleDelete = async (id) => {
       if(!window.confirm("Permanently delete artifact?")) return;
@@ -77,6 +120,37 @@ export default function ProjectFiles() {
       } catch (error) {
           toast.error("Delete failed");
       }
+  };
+
+  const handleDownload = (file) => {
+      let blob;
+      let filename = file.name;
+
+      if (file.content.startsWith('data:')) {
+          // Base64
+          const arr = file.content.split(',');
+          const mime = arr[0].match(/:(.*?);/)[1];
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while(n--){
+              u8arr[n] = bstr.charCodeAt(n);
+          }
+          blob = new Blob([u8arr], {type:mime});
+      } else {
+          // Text
+          blob = new Blob([file.content], { type: 'text/plain' });
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Download started");
   };
 
   const getIcon = (type) => {
@@ -93,7 +167,7 @@ export default function ProjectFiles() {
     .filter(f => filterType === 'All' || f.category === filterType);
 
   return (
-    <div className="h-full flex flex-col bg-background/50">
+    <div className="h-full flex flex-col">
         <div className="flex-1 flex flex-col p-6 lg:p-10 space-y-6 overflow-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -139,18 +213,45 @@ export default function ProjectFiles() {
                             <DialogHeader>
                                 <DialogTitle>Create Artifact</DialogTitle>
                             </DialogHeader>
-                            <form onSubmit={handleCreateFile} className="space-y-4 mt-4">
-                                <Input placeholder="Filename..." value={newFileName} onChange={e => setNewFileName(e.target.value)} required />
-                                <Select value={newFileCategory} onValueChange={setNewFileCategory}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Docs">Documentation</SelectItem>
-                                        <SelectItem value="Mockups">Component</SelectItem>
-                                        <SelectItem value="Assets">Asset</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Button type="submit" className="w-full">Initialize</Button>
-                            </form>
+                            <Tabs defaultValue="blank" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="blank">Create Blank</TabsTrigger>
+                                    <TabsTrigger value="upload">Upload File</TabsTrigger>
+                                </TabsList>
+                                <form onSubmit={handleCreateFile} className="mt-4 space-y-4">
+                                    <TabsContent value="blank" className="space-y-4">
+                                        <Input placeholder="Filename (e.g. Note.md)" value={newFileName} onChange={e => setNewFileName(e.target.value)} />
+                                    </TabsContent>
+                                    <TabsContent value="upload" className="space-y-4">
+                                        <div className="flex flex-col gap-2">
+                                            <Input 
+                                                type="file" 
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if(file) {
+                                                        setUploadFile(file);
+                                                        setNewFileName(file.name);
+                                                    }
+                                                }} 
+                                            />
+                                            <p className="text-xs text-muted-foreground">Supports images, code, and text files.</p>
+                                        </div>
+                                    </TabsContent>
+                                    
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Category</label>
+                                        <Select value={newFileCategory} onValueChange={setNewFileCategory}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Docs">Documentation</SelectItem>
+                                                <SelectItem value="Mockups">Component</SelectItem>
+                                                <SelectItem value="Assets">Asset</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button type="submit" className="w-full">Initialize Artifact</Button>
+                                </form>
+                            </Tabs>
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -161,7 +262,10 @@ export default function ProjectFiles() {
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                         {filteredFiles.map(file => (
                             <Card key={file.id} className="group bg-secondary/10 border-white/5 hover:border-primary/50 transition-all cursor-pointer overflow-hidden relative">
-                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                    <Button variant="secondary" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDownload(file); }}>
+                                        <Download className="h-3 w-3" />
+                                    </Button>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4" /></Button>
@@ -180,7 +284,12 @@ export default function ProjectFiles() {
                                     </DropdownMenu>
                                 </div>
                                 <CardContent className="flex flex-col items-center justify-center p-8 space-y-4" onClick={() => setPreviewFile(file)}>
-                                    {getIcon(file.type)}
+                                    {/* Thumbnail for images */}
+                                    {file.type === 'asset' && file.content.startsWith('data:image') ? (
+                                        <img src={file.content} alt={file.name} className="h-16 w-16 object-cover rounded-md" />
+                                    ) : (
+                                        getIcon(file.type)
+                                    )}
                                     <div className="text-center">
                                         <p className="font-medium text-sm truncate w-[120px]">{file.name}</p>
                                         <p className="text-xs text-muted-foreground">{file.category}</p>
@@ -204,6 +313,7 @@ export default function ProjectFiles() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDownload(file)}><Download className="h-4 w-4" /></Button>
                                     <Button variant="ghost" size="sm" onClick={() => setPreviewFile(file)}>Quick Look</Button>
                                     <Button variant="secondary" size="sm" onClick={() => navigate(`/project/${projectId}/editor/${file.id}`)}>Open Editor</Button>
                                     <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(file.id)}><Trash2 className="h-4 w-4"/></Button>
@@ -219,11 +329,16 @@ export default function ProjectFiles() {
                     <DialogHeader>
                         <DialogTitle className="font-mono">{previewFile?.name}</DialogTitle>
                     </DialogHeader>
-                    <div className="flex-1 bg-black/50 rounded-md border border-white/10 p-4 overflow-auto font-mono text-sm whitespace-pre-wrap">
-                        {previewFile?.content || 'No content.'}
+                    <div className="flex-1 bg-black/50 rounded-md border border-white/10 p-4 overflow-auto font-mono text-sm whitespace-pre-wrap flex items-center justify-center">
+                        {previewFile?.type === 'asset' && previewFile.content.startsWith('data:image') ? (
+                             <img src={previewFile.content} alt={previewFile.name} className="max-w-full max-h-full" />
+                        ) : (
+                             <div className="w-full h-full text-left">{previewFile?.content || 'No content.'}</div>
+                        )}
                     </div>
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setPreviewFile(null)}>Close</Button>
+                        <Button variant="secondary" onClick={() => handleDownload(previewFile)}>Download</Button>
                         <Button onClick={() => { setPreviewFile(null); navigate(`/project/${projectId}/editor/${previewFile.id}`); }}>Open Full Editor</Button>
                     </div>
                 </DialogContent>
