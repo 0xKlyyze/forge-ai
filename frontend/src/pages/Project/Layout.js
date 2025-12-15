@@ -1,78 +1,89 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Home, 
   FileText, 
   CheckSquare, 
   Settings, 
-  ChevronRight,
-  Code
+  Code,
+  Plus,
+  LogOut
 } from 'lucide-react';
-import { Outlet, useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useParams, NavLink } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 
-const NAV_ITEMS = [
-  { id: 'home', icon: Home, label: 'Overview', path: 'home' },
-  { id: 'files', icon: FileText, label: 'Artifacts', path: 'files' },
-  { id: 'editor', icon: Code, label: 'Code Editor', path: 'editor' }, // Added Editor Tab
-  { id: 'tasks', icon: CheckSquare, label: 'Tasks', path: 'tasks' },
-  { id: 'settings', icon: Settings, label: 'Settings', path: 'settings' }
-];
+// Main Navigation Link Component (Adapted from Mockup)
+const MainNavLink = ({ to, label, icon: Icon }) => (
+    <NavLink
+        to={to}
+        className={({ isActive }) => `
+            flex flex-col items-center justify-center gap-2 w-20 h-20 rounded-2xl 
+            transition-all duration-200 group
+            ${isActive ? 'bg-primary text-primary-foreground shadow-lg scale-105' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}
+        `}
+    >
+        <Icon size={24} strokeWidth={2} />
+        <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
+    </NavLink>
+);
 
 export default function ProjectLayout() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  // Extract the second segment of the path relative to the project root
-  // e.g., /project/123/editor -> 'editor'
-  // e.g., /project/123/editor/456 -> 'editor'
-  const pathParts = location.pathname.split('/');
-  const projectIndex = pathParts.indexOf('project');
-  const currentPath = pathParts[projectIndex + 2]; 
+
+  const mainNavItems = [
+    { to: `/project/${projectId}/home`, label: 'Home', icon: Home },
+    { to: `/project/${projectId}/files`, label: 'Artifacts', icon: FileText },
+    { to: `/project/${projectId}/editor`, label: 'Editor', icon: Code },
+    { to: `/project/${projectId}/tasks`, label: 'Mission', icon: CheckSquare },
+  ];
 
   return (
-    <div className="h-screen flex bg-background">
-      {/* Sidebar */}
-      <aside className="w-16 lg:w-64 border-r border-white/5 bg-secondary/10 flex flex-col items-center lg:items-stretch py-4">
-        <div className="px-4 mb-8 flex items-center gap-2">
-           <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-mono font-bold">F</div>
-           <span className="hidden lg:block font-mono font-bold tracking-tight">FORGE</span>
-        </div>
+    <div className="h-screen w-screen bg-background flex antialiased overflow-hidden relative">
         
-        <nav className="flex-1 space-y-1 px-2">
-          {NAV_ITEMS.map((item) => {
-            const isActive = currentPath === item.path || (item.path === 'home' && !currentPath);
-            return (
-              <Link 
-                key={item.id} 
-                to={`/project/${projectId}/${item.path}`}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors
-                  ${isActive 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-                  }
-                `}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="hidden lg:block">{item.label}</span>
-                {isActive && <ChevronRight className="ml-auto h-4 w-4 opacity-50 hidden lg:block" />}
-              </Link>
-            )
-          })}
+        {/* Navigation Sidebar */}
+        <nav className="w-28 flex-shrink-0 flex flex-col items-center py-6 gap-6 bg-background border-r border-border/40 z-20">
+            {/* 1. App Icon */}
+            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 mb-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
+                <span className="font-mono font-black text-2xl text-primary-foreground">F</span>
+            </div>
+            
+            {/* 2. Primary Action (Placeholder for quick create) */}
+            <button
+                onClick={() => navigate(`/project/${projectId}/tasks`)}
+                title="New Task"
+                className="p-4 bg-secondary/50 rounded-full hover:bg-primary/10 border border-border text-muted-foreground hover:text-primary transition-colors duration-200"
+            >
+                <Plus size={24} strokeWidth={2} />
+            </button>
+
+            {/* 3. Main Navigation */}
+            <div className="flex-1 flex flex-col items-center gap-4 w-full px-2">
+                {mainNavItems.map(item => (
+                    <MainNavLink key={item.to} {...item} />
+                ))}
+            </div>
+
+            {/* 4. Utilities */}
+            <div className="flex flex-col items-center gap-4 mb-4">
+                <MainNavLink to={`/project/${projectId}/settings`} label="Config" icon={Settings} />
+                <button 
+                    onClick={() => navigate('/dashboard')}
+                    className="p-3 text-muted-foreground hover:text-destructive transition-colors"
+                    title="Exit Project"
+                >
+                    <LogOut size={20} />
+                </button>
+            </div>
         </nav>
-
-        <div className="px-4 mt-auto">
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => navigate('/dashboard')}>
-                 <span className="hidden lg:inline">Exit Project</span>
-                 <span className="lg:hidden">Exit</span>
-            </Button>
+        
+        {/* Main content wrapper */}
+        <div className="flex-1 min-w-0 h-screen p-3 bg-background">
+            <main className="h-full w-full bg-secondary/10 flex flex-col relative overflow-hidden rounded-2xl border border-white/5 shadow-2xl backdrop-blur-3xl">
+                <div className="flex-1 overflow-y-auto">
+                    <Outlet />
+                </div>
+            </main>
         </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden flex flex-col">
-         <Outlet />
-      </main>
     </div>
   );
 }
