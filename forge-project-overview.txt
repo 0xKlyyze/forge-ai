@@ -1,0 +1,381 @@
+# Project Overview: AI Development Workflow Manager
+
+## Core Concept
+
+A centralized cloud-based project management application designed specifically for AI-powered development workflows. The app eliminates the friction of managing multiple project files across devices by providing an auto-organized, template-based system for storing, editing, and previewing all project-related artifacts in one place.
+
+**Primary Value Proposition:** Instant project setup with enforced structure + seamless cross-device access + unified editing environment for documentation, mockups, and assets.
+
+## Target User
+
+**Profile:** Solo developer (18 years old) building AI-powered applications using AI development agents. Works across multiple devices and manages several projects simultaneously. Needs quick context switching and minimal organizational overhead.
+
+**Current Pain Points:**
+- File hunting across devices when resuming paused projects
+- Manual folder structure creation for each new project
+- Context loss when switching between projects
+- No unified preview environment for UI mockups
+- Time wasted on file management instead of building
+
+**Success Metrics:** Reduces project setup time to under 30 seconds. Eliminates need for local file searching. Provides instant context when reopening old projects.
+
+## Project Scope
+
+- **Certainty Level:** 3/5 (Moderately committed, exploring viability)
+- **Build Scope:** 2/5 (Lean personal tool, not enterprise-grade)
+- **Commercial Intent:** 1/5 (Purely personal use)
+
+**Implication:** Focus on MVP functionality. Prioritize speed of development over scalability. Use simple, proven tech stack. Avoid over-engineering.
+
+## Key Features
+
+### Phase 1: MVP (Must Build First)
+
+**1. One-Click Project Creation**
+- Click "New Project" → Instant generation of standardized folder structure
+- Auto-creates template files:
+  - `Project-Overview.md`
+  - `Implementation-Plan.md`
+  - `Technical-Stack.md`
+  - `App-Structure.md`
+  - `UI-Guidelines.md`
+- Each template contains section headers/prompts to guide content creation
+- Project metadata captured: name, creation date, status
+
+**2. Project Dashboard (Home Screen)**
+- Grid or list view of all projects
+- Each project card shows:
+  - Project name
+  - Last edited timestamp
+  - Current status (Planning/Building/Paused/Complete)
+  - Quick stats (file count)
+- Search bar for project filtering
+- "New Project" button prominently displayed
+
+**3. Individual Project Workspace**
+- Split view layout:
+  - Left sidebar: File browser with category tabs
+  - Center: Content editor/viewer
+  - Right (conditional): Live preview panel for mockups
+- File browser categories:
+  - 📄 **Docs** (markdown files)
+  - 🎨 **Mockups** (JSX/TSX files)
+  - 🖼️ **Assets** (images: logo, icon, screenshots)
+  - 📦 **Other** (any additional files)
+
+**4. Markdown Editor**
+- Simple WYSIWYG-style markdown editor
+- Live preview toggle
+- Auto-save to cloud (every 2-3 seconds)
+- Syntax highlighting for code blocks
+
+**5. Code Editor with Live Preview**
+- Monaco Editor or similar for JSX/TSX files
+- Split-pane view: code on left, preview on right
+- Integrate CodeSandbox Sandpack component for preview
+- Hot reload when code changes
+- Auto-save functionality
+
+**6. Cloud Sync & Storage**
+- All files automatically synced to cloud
+- No manual save button needed
+- File versioning handled by storage provider
+- Supports markdown, code files, and images
+
+**7. Quick File Creation**
+- Within each category, "New File" button with templates:
+  - New Implementation Plan
+  - New Tech Stack Doc
+  - New Mockup File (JSX/TSX)
+  - Upload Asset
+- Templates pre-populate with relevant section headers
+
+**8. Image Upload & Gallery**
+- Drag-and-drop image upload
+- Preview thumbnails in Assets section
+- Support for PNG, JPG, SVG
+- Click to view full-size
+
+### Phase 2: Enhancement Features (Post-MVP)
+
+**9. Source of Truth Priority System**
+- Each documentation file has a "Priority Level" setting (1-10)
+- Higher number = higher priority
+- UI indicator showing priority level next to file name
+- Purpose: When building API/MCP integration, conflicting information resolved by priority
+- Use case: New architecture decision doc overrides old tech stack doc
+- Implementation note: Store priority as metadata field in database
+
+**10. Project Tagging**
+- Add tags to projects (e.g., "Web App", "Mobile", "AI Tool", "Chrome Extension")
+- Filter projects by tag on dashboard
+- Multi-tag support per project
+- Tag creation on-the-fly
+
+**11. Project Management Tools**
+
+**To-Do Lists:**
+- Simple checklist per project
+- Add/edit/delete tasks
+- Mark complete/incomplete
+- Link tasks to specific files (e.g., "Update Implementation Plan" → links to Implementation-Plan.md)
+- Task metadata: due date, priority
+
+**Kanban Board:**
+- Columns: Backlog / To Do / In Progress / Done
+- Drag-and-drop task cards between columns
+- Each card can link to files or be standalone
+- Useful for feature development tracking
+
+**Eisenhower Matrix:**
+- 2x2 grid: Urgent/Not Urgent × Important/Not Important
+- Drag tasks into quadrants
+- Helps prioritize bug fixes vs new features
+- Visual decision-making tool
+
+**12. File Duplication**
+- Copy files within project or between projects
+- Useful for reusing templates or starting similar projects
+
+**13. Recent Files Widget**
+- Dashboard widget showing last 5 edited files across all projects
+- Quick-access links to jump directly to file
+
+**14. Project Status Tracking**
+- Dropdown status selector: Planning / Building / Testing / Paused / Complete
+- Color-coded status indicators on dashboard
+- Filter projects by status
+
+### Phase 3: Future Enhancements (Nice-to-Have)
+
+**15. Version History**
+- Simple snapshot system for file changes
+- View previous versions
+- Restore if needed
+
+**16. Project Templates**
+- Save entire project structure as reusable template
+- "New Project from Template" option
+
+**17. Export Project**
+- Download entire project as ZIP file
+- Useful for backup or local development
+
+**18. Mobile Companion App**
+- Quick edits to docs on mobile
+- View mockup previews
+- Update task status
+
+## Technical Architecture
+
+### Frontend Stack
+- **Framework:** React with TypeScript
+- **State Management:** React Context or Zustand (lightweight)
+- **Routing:** React Router
+- **Styling:** Tailwind CSS (rapid development)
+- **Code Editor:** Monaco Editor (VSCode engine)
+- **Mockup Preview:** CodeSandbox Sandpack React component
+- **Markdown Editor:** React Markdown Editor library or build custom
+
+### Backend & Storage
+- **Database:** Firebase Firestore or Supabase (PostgreSQL)
+  - Store project metadata, file references, task data
+- **File Storage:** Firebase Storage or Supabase Storage
+  - Store actual file contents (markdown, code, images)
+- **Authentication:** Firebase Auth or Supabase Auth
+  - Simple email/password or Google OAuth
+  - Enables multi-device access
+
+### Data Models
+
+**Project:**
+```
+{
+  id: string
+  name: string
+  createdAt: timestamp
+  lastEdited: timestamp
+  status: 'planning' | 'building' | 'testing' | 'paused' | 'complete'
+  tags: string[]
+  userId: string
+}
+```
+
+**File:**
+```
+{
+  id: string
+  projectId: string
+  name: string
+  type: 'doc' | 'mockup' | 'asset' | 'other'
+  category: string
+  content: string (or storage URL for assets)
+  priority: number (1-10, for source of truth)
+  createdAt: timestamp
+  lastEdited: timestamp
+}
+```
+
+**Task (Phase 2):**
+```
+{
+  id: string
+  projectId: string
+  title: string
+  description: string
+  status: 'todo' | 'in-progress' | 'done'
+  linkedFiles: string[] (file IDs)
+  dueDate: timestamp | null
+  priority: 'high' | 'medium' | 'low'
+  kanbanColumn: string
+  eisenhowerQuadrant: 'urgent-important' | 'not-urgent-important' | 'urgent-not-important' | 'not-urgent-not-important'
+}
+```
+
+## UI/UX Design Guidelines
+
+### Layout Structure
+- **Dashboard:** Clean grid/list with prominent search and "New Project" CTA
+- **Project View:** Three-column layout when preview active, two-column otherwise
+- **Responsive:** Desktop-first (primary use case), mobile-friendly later
+
+### Color Scheme
+- Keep it minimal and professional
+- Light mode default (dark mode is Phase 3)
+- Accent color for CTAs and active states
+- Category-specific colors for visual organization
+
+### Navigation Flow
+```
+Home Dashboard
+  ↓
+Create New Project → Auto-generate structure
+  ↓
+Project Workspace
+  ├── Docs Category (default view)
+  ├── Mockups Category (split view with preview)
+  ├── Assets Category (gallery view)
+  └── Project Management (Phase 2)
+```
+
+### File Browser Behavior
+- Collapsible categories
+- File count badge per category
+- Recently edited indicator (green dot)
+- Priority level badge for docs (Phase 2)
+- Linked task count indicator (Phase 2)
+
+## Auto-Generated Folder Structure
+
+When creating a new project, automatically generate:
+
+```
+Project Name/
+├── Docs/
+│   ├── Project-Overview.md
+│   ├── Implementation-Plan.md
+│   ├── Technical-Stack.md
+│   ├── App-Structure.md
+│   └── UI-Guidelines.md
+├── Mockups/
+│   └── (empty, ready for JSX/TSX files)
+├── Assets/
+│   └── (empty, ready for images)
+└── Other/
+    └── (empty, flexible storage)
+```
+
+Each markdown template should include:
+- File purpose/description at top
+- Section headers to guide content
+- Example: Implementation-Plan.md includes "## Phase 1", "## Phase 2", "## Technical Approach"
+
+## Critical Implementation Notes
+
+### Source of Truth Priority (Phase 2)
+- This feature prepares the app for future API/MCP integration
+- When AI agents query project info, they should respect priority levels
+- UI should make priority visible but not overwhelming
+- Default priority: 5 (mid-level)
+- User can adjust per file as needed
+
+### CodeSandbox Integration
+- Use Sandpack component (official React wrapper)
+- Configure for React environment
+- Handle dependencies gracefully (default to React only for MVP)
+- Error boundaries for preview failures
+
+### Auto-Save Strategy
+- Debounce editor changes (2-3 second delay)
+- Visual indicator when saving (subtle)
+- Prevent data loss on network issues (local cache)
+
+### Performance Considerations
+- Lazy load file contents (don't load all files at once)
+- Paginate project list if >50 projects
+- Optimize image uploads (compress before storage)
+- Code splitting for route-based loading
+
+## Development Priorities
+
+### Week 1-2: Core Infrastructure
+1. Project creation and folder structure generation
+2. Basic file storage and retrieval (cloud)
+3. Markdown editor with auto-save
+4. Simple project dashboard
+
+### Week 3-4: Editing & Preview
+1. Code editor integration (Monaco)
+2. Sandpack preview implementation
+3. File browser with categories
+4. Image upload and gallery
+
+### Week 5+: Enhancement
+1. Tagging system
+2. Source of truth priority
+3. Project management tools (To-Dos, Kanban, Matrix)
+4. File linking to tasks
+
+## Success Criteria
+
+**MVP Launch Checklist:**
+- [ ] Can create new project in under 30 seconds
+- [ ] All standard doc templates auto-generated
+- [ ] Can edit markdown files with live preview
+- [ ] Can edit JSX/TSX files with live Sandpack preview
+- [ ] Can upload and view images
+- [ ] Files auto-save to cloud reliably
+- [ ] Can access projects from any device
+- [ ] Search and filter projects on dashboard
+
+**Phase 2 Goals:**
+- [ ] Can prioritize documentation files
+- [ ] Can create and manage tasks across all PM tools
+- [ ] Can link files to tasks
+- [ ] Can tag and filter projects
+
+## Risk Mitigation
+
+**Potential Issues:**
+1. **Sandpack Performance:** May be slow for complex components
+   - Mitigation: Start with simple React components only
+2. **Storage Costs:** Image/file storage could add up
+   - Mitigation: Firebase free tier is generous; compression helps
+3. **Sync Conflicts:** Rare if only one user, but possible
+   - Mitigation: Last-write-wins for MVP (version history later)
+
+## API/MCP Future Considerations
+
+The "Source of Truth Priority" feature enables future AI agent integrations:
+- AI agents can query project docs via API
+- Priority system ensures correct info retrieval
+- Potential endpoints:
+  - `GET /project/:id/docs` (returns all docs with priority)
+  - `GET /project/:id/context` (returns consolidated project info)
+  - `POST /project/:id/task` (create task from external agent)
+
+This positions the app as a knowledge base for AI development workflows.
+
+***
+
+**This document should provide your AI Developer Agent with complete context to begin implementation. The enforced template structure, phased feature approach, and technical specifications are all clearly defined. The priority is building a lean, functional MVP that solves your immediate pain points while leaving room for future enhancements.**
