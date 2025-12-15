@@ -5,7 +5,10 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Workspace from './pages/Workspace';
+import ProjectLayout from './pages/Project/Layout';
+import ProjectHome from './pages/Project/Home';
+import Workspace from './pages/Workspace'; // This is now the "Files" view
+import ProjectTasks from './pages/Project/Tasks';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -25,6 +28,8 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            
+            {/* Dashboard Route */}
             <Route 
               path="/dashboard" 
               element={
@@ -33,15 +38,24 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            
+            {/* New Nested Project Routes */}
             <Route 
-              path="/project/:projectId" 
-              element={
-                <PrivateRoute>
-                  <Workspace />
-                </PrivateRoute>
-              } 
-            />
-             <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                path="/project/:projectId"
+                element={
+                    <PrivateRoute>
+                        <ProjectLayout />
+                    </PrivateRoute>
+                }
+            >
+                <Route index element={<Navigate to="home" replace />} />
+                <Route path="home" element={<ProjectHome />} />
+                <Route path="files" element={<Workspace />} />
+                <Route path="tasks" element={<ProjectTasks />} />
+                <Route path="settings" element={<div className="p-10 text-white">Settings Coming Soon</div>} />
+            </Route>
+
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>
       </AuthProvider>

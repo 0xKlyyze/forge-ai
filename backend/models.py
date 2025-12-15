@@ -30,7 +30,8 @@ class ProjectModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     name: str
     user_id: str
-    status: str = "planning" # planning, building, paused, complete
+    status: str = "planning" 
+    tags: List[str] = []
     created_at: datetime = Field(default_factory=datetime.now)
     last_edited: datetime = Field(default_factory=datetime.now)
 
@@ -38,13 +39,26 @@ class FileModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     project_id: str
     name: str
-    type: str # doc, mockup, asset, other
-    category: str # Docs, Mockups, Assets, Other
+    type: str 
+    category: str 
     content: str = ""
+    priority: int = 5 # 1-10, 10 is highest
     created_at: datetime = Field(default_factory=datetime.now)
     last_edited: datetime = Field(default_factory=datetime.now)
 
-# Response Models (hiding internal fields if necessary)
+class TaskModel(BaseModel):
+    id: Optional[str] = Field(default=None, alias="_id")
+    project_id: str
+    title: str
+    description: str = ""
+    status: str = "todo" # todo, in-progress, done
+    priority: str = "medium" # low, medium, high
+    quadrant: str = "q2" # q1 (urgent-important), q2 (not-urgent-important), q3 (urgent-not-important), q4 (not-urgent-not-important)
+    linked_files: List[str] = [] # List of file IDs
+    due_date: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+
+# Response Models
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -53,6 +67,7 @@ class ProjectResponse(BaseModel):
     id: str
     name: str
     status: str
+    tags: List[str] = []
     created_at: datetime
     last_edited: datetime
 
@@ -63,4 +78,17 @@ class FileResponse(BaseModel):
     type: str
     category: str
     content: str
+    priority: int
     last_edited: datetime
+
+class TaskResponse(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    description: str
+    status: str
+    priority: str
+    quadrant: str
+    linked_files: List[str]
+    due_date: Optional[datetime]
+    created_at: datetime
