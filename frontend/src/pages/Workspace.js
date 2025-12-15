@@ -13,6 +13,7 @@ import { debounce } from 'lodash';
 export default function Workspace() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [file, setFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
   const [project, setProject] = useState(null);
