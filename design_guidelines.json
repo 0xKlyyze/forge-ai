@@ -1,0 +1,132 @@
+{
+  "identity": {
+    "name": "E1",
+    "archetype": "The Anti-AI Designer",
+    "mission": "Create a developer workflow tool that feels like a futuristic control room, not a generic SaaS dashboard."
+  },
+  "design_philosophy": {
+    "core_principles": [
+      "Fusion over Imitation: Mix Terminal aesthetics with Swiss typography.",
+      "Emotion First: The user should feel powerful and in control.",
+      "Content is King: Data density is a feature, not a bug for developers.",
+      "Negative Space: Use it to group logic, not just for decoration.",
+      "Contrast: High contrast for code legibility and alert states."
+    ],
+    "anti_patterns": [
+      "No generic 'Inter' font for headings.",
+      "No 'Center-Everything'. Use asymmetric grids.",
+      "No full-screen gradients. Use texture and deep backgrounds.",
+      "No 'Purple/Teal' generic SaaS gradients."
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Azeret Mono, monospace",
+      "body": "IBM Plex Sans, sans-serif",
+      "code": "JetBrains Mono, Fira Code, monospace"
+    },
+    "weights": {
+      "headings": "Bold (700) or Black (900)",
+      "body": "Regular (400) or Medium (500)"
+    },
+    "rules": [
+      "Headings (>32px) must use tracking-tight.",
+      "Overlines/Labels must be Uppercase + tracking-widest + text-xs.",
+      "Line height: Tight (1.1) for headings, Relaxed (1.6) for body."
+    ],
+    "installation": "Import from Google Fonts: https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;700;900&family=IBM+Plex+Sans:wght@400;500;700&display=swap"
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": "#09090b",
+      "foreground": "#f4f4f5",
+      "primary": "#6366f1",
+      "primary_foreground": "#ffffff",
+      "secondary": "#27272a",
+      "secondary_foreground": "#fafafa",
+      "accent": "#06b6d4",
+      "destructive": "#ef4444",
+      "border": "#27272a",
+      "input": "#27272a",
+      "ring": "#6366f1"
+    },
+    "chart_colors": {
+      "chart_1": "#6366f1",
+      "chart_2": "#06b6d4",
+      "chart_3": "#10b981",
+      "chart_4": "#f59e0b",
+      "chart_5": "#ec4899"
+    },
+    "rules": [
+      "Never use pure black (#000000). Use #09090b (Zinc 950).",
+      "Text on hover must explicitly change color (e.g., hover:text-white).",
+      "Borders should be subtle (#27272a) unless active/focused."
+    ]
+  },
+  "layout": {
+    "grid_system": {
+      "marketing": "Mode A: The Tetris Grid (Asymmetric, gap-8)",
+      "dashboard": "Mode B: The Control Room Grid (Dense, gap-4, grid-cols-4)"
+    },
+    "spacing": {
+      "scale": "p-1, p-2, p-4, p-6, p-8, p-12, p-16, p-24, p-32",
+      "rule": "Use 2x more spacing than typical. Containers with borders must have internal padding (p-6)."
+    },
+    "alignment": {
+      "default": "Left aligned",
+      "headings": "Left aligned (unless hero center)",
+      "mobile": "Single column (grid-cols-1)"
+    }
+  },
+  "components": {
+    "strategy": "Hybrid",
+    "marketing_components": "Custom HTML + Tailwind. No pre-built cards.",
+    "app_components": "Shadcn/UI customized.",
+    "customization_rules": {
+      "cards": "Use 'Grid Borders' style. No shadow by default. 1px border. Square or sm radius.",
+      "buttons": "Sharp edges or rounded-md. No pill shapes. High contrast hover.",
+      "inputs": "Flat background (#18181b), distinct border. Focus ring: primary color.",
+      "modals": "Glassmorphism: bg-black/80, backdrop-blur-xl, border-white/10."
+    },
+    "visual_enhancers": {
+      "tracing_beam": "Use for active cards or pricing tables.",
+      "glassmorphism": "Use for sticky headers and overlays.",
+      "grid_borders": "Use for dashboard layout (border-r, border-b on items).",
+      "scanlines": "Optional overlay for 'Terminal' feel in specific sections."
+    }
+  },
+  "motion": {
+    "library": "Framer Motion",
+    "types": {
+      "hover": "Scale 1.02, brightness 1.1",
+      "entrance": "Staggered fade-in-up (y: 20 -> 0, opacity: 0 -> 1)",
+      "transition": "Spring physics (stiffness: 100, damping: 20)"
+    },
+    "rules": [
+      "Respect prefers-reduced-motion.",
+      "No 'transition: all'. Animate specific properties.",
+      "Use 'sonner' for toasts."
+    ]
+  },
+  "media": {
+    "image_style": "Abstract, Cyber, High-Tech, Dark",
+    "image_urls": {
+      "hero_background": "https://images.unsplash.com/photo-1764258560300-2346b28b4e7c?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "feature_abstract_1": "https://images.unsplash.com/photo-1762014270365-b64d35a829f5?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "feature_abstract_2": "https://images.unsplash.com/photo-1664526937033-fe2c11f1be25?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "login_bg": "https://images.unsplash.com/photo-1635340038191-96eea7fbd056?crop=entropy&cs=srgb&fm=jpg&q=85"
+    },
+    "icons": "Lucide React (default), Phosphor Icons (for dense dashboards)"
+  },
+  "universal_guidelines": [
+    "Do not use generic centered layouts.",
+    "Create depth through z-index and layered elements.",
+    "Use glassmorphism with backdrop-blur-xl.",
+    "Every interaction needs a micro-animation.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Never use AI assistant emojis (🤖, 🚀) as icons.",
+    "All interactive elements must have data-testid."
+  ],
+  "instructions_to_main_agent": "Implement the design system by updating tailwind.config.js first. Then create a global layout wrapper. Use the specified fonts. When building the dashboard, strictly follow the 'Control Room' grid mode."
+}
