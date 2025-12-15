@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProjectLayout from './pages/Project/Layout';
 import ProjectHome from './pages/Project/Home';
+import ProjectFiles from './pages/Project/Files';
 import Workspace from './pages/Workspace'; // This is now the "Files" view
 import ProjectTasks from './pages/Project/Tasks';
 
