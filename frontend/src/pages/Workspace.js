@@ -34,6 +34,14 @@ export default function Workspace() {
       if (fileId) {
         const found = filesRes.data.find(f => f.id === fileId);
         if (found) setActiveFile(found);
+      } else {
+        // Check for ?file= query param
+        const searchParams = new URLSearchParams(window.location.search);
+        const fileName = searchParams.get('file');
+        if (fileName) {
+          const found = filesRes.data.find(f => f.name === fileName);
+          if (found) setActiveFile(found);
+        }
       }
     } catch (error) {
       console.error("Failed to load workspace data", error);

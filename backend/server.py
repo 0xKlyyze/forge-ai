@@ -6,7 +6,7 @@ from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileM
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
 from typing import List
-from chat import generate_response, get_available_models, edit_selection
+from chat import generate_response, get_available_models, edit_selection, assess_project_potential
 from bson import ObjectId
 import os
 
@@ -124,6 +124,20 @@ async def list_projects(current_user: dict = Depends(get_current_user)):
         ))
     return projects
 
+@app.post("/api/projects/{project_id}/assessment")
+async def get_project_assessment(project_id: str, current_user: dict = Depends(get_current_user)):
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    cursor = db.files.find({"project_id": project_id})
+    files = await cursor.to_list(length=100)
+    
+    files_data = [{"name": f["name"], "content": f.get("content", ""), "type": f["type"]} for f in files]
+    
+    assessment = await assess_project_potential(project["name"], files_data)
+    return assessment
+    
 @app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str, current_user: dict = Depends(get_current_user)):
     project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})

@@ -105,6 +105,44 @@ export default function ProjectLayout() {
         }
     }, [project?.icon]);
 
+    // Global Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Ignore if input/textarea is focused or if ANY modifier key is pressed (except maybe shift for capitalization, but let's stick to simple keys)
+            // User requested "without the alt".
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            if (e.metaKey || e.ctrlKey || e.altKey) return; // Avoid conflict with browser shortcuts
+
+            switch (e.key.toLowerCase()) {
+                // Quick Actions
+                case 'n':
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent('open-new-task'));
+                    break;
+                case 'd':
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent('open-new-doc'));
+                    break;
+                case 'u':
+                    e.preventDefault();
+                    // Trigger upload input
+                    document.getElementById('quick-up')?.click();
+                    window.dispatchEvent(new CustomEvent('trigger-upload'));
+                    break;
+
+                // Navigation
+                case '1': e.preventDefault(); navigate(`/project/${projectId}/home`); break;
+                case '2': e.preventDefault(); navigate(`/project/${projectId}/chat`); break;
+                case '3': e.preventDefault(); navigate(`/project/${projectId}/files`); break;
+                case '4': e.preventDefault(); navigate(`/project/${projectId}/editor`); break;
+                case '5': e.preventDefault(); navigate(`/project/${projectId}/tasks`); break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [projectId, navigate]);
+
     const mainNavItems = [
         { to: `/project/${projectId}/home`, label: 'Home', icon: Home },
         { to: `/project/${projectId}/chat`, label: 'Advisor', icon: Sparkles },
@@ -155,9 +193,20 @@ export default function ProjectLayout() {
             </nav>
 
             {/* Main content wrapper */}
-            <div className="flex-1 min-w-0 h-screen pt-3 pr-3 pb-3 pl-0">
+            <div className="flex-1 min-w-0 h-screen pt-3 pr-3 pb-3 pl-0 z-10">
                 <main className="h-full w-full bg-black/40 flex flex-col relative overflow-hidden rounded-2xl border border-white/5 shadow-2xl backdrop-blur-md">
-                    <div className="flex-1 overflow-y-auto">
+                    {/* Frame Gradient Overlays - Visible Inside The Glass */}
+                    {/* Top Left: Primary Glow with multiple layers for depth */}
+                    <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-primary/10 rounded-full blur-[150px] pointer-events-none z-0 mix-blend-screen" />
+                    <div className="absolute top-[5%] left-[5%] w-[30%] h-[30%] bg-primary/15 rounded-full blur-[90px] pointer-events-none z-0 mix-blend-screen" />
+
+                    {/* Accent Glow - Also moved to Top-Left/Center area for unified light source */}
+                    <div className="absolute -top-[10%] left-[0%] w-[40%] h-[40%] bg-accent/10 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen" />
+
+                    {/* Subtle ambient fill - kept low */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5 pointer-events-none z-0" />
+
+                    <div className="flex-1 overflow-y-auto relative z-10">
                         <Outlet />
                     </div>
                 </main>

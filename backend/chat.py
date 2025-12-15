@@ -181,3 +181,62 @@ async def edit_selection(
         print(f"Edit selection error: {e}")
         traceback.print_exc()
         raise e
+
+async def assess_project_potential(project_name: str, files: list) -> dict:
+    """
+    Generate a brutally honest assessment of the project based on its files.
+    Returns a JSON breakdown of ratings and feedback.
+    """
+    system_instruction = """
+    You are a brutally honest, no-nonsense VC and Tech Lead. 
+    You are assessing a technical project based on its initial documentation (Overview, Tech Stack, Plan).
+    
+    YOUR GOAL: Provide a "brutally honest" assessment. Do not hold back.
+    
+    OUTPUT FORMAT: Return a valid JSON object ONLY, with the following structure:
+    {
+        "ratings": {
+            "innovation": 0-10,
+            "feasibility": 0-10,
+            "market_potential": 0-10
+        },
+        "unclear_areas": ["list", "of", "vague", "points"],
+        "missing_components": ["list", "of", "technical", "gaps"],
+        "summary": "A short, punchy paragraph (max 100 words). Be direct. If it's generic, say it. If it's genius, say it."
+    }
+    """
+    
+    file_context = _format_files(files)
+    
+    prompt = f"""
+    Assess the project "{project_name}".
+    
+    FILES SUBMITTED:
+    {file_context}
+    
+    Generate the assessment JSON.
+    """
+    
+    try:
+        response = await client.aio.models.generate_content(
+            model="gemini-flash-latest",
+            contents=[types.Content(role='user', parts=[types.Part.from_text(text=prompt)])],
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json"
+            )
+        )
+        
+        import json
+        return json.loads(response.text)
+        
+    except Exception as e:
+        print(f"Assessment error: {e}")
+        traceback.print_exc()
+        # Return a fallback in case of error
+        return {
+            "ratings": {"innovation": 0, "feasibility": 0, "market_potential": 0},
+            "unclear_areas": ["Could not generate assessment due to error."],
+            "missing_components": [],
+            "summary": "Assessment generation failed. Please try again."
+        }

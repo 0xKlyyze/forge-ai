@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/input';
 import {
     FileText, Star, CheckCircle2, ArrowRight, Zap,
     Upload, History, Bot, Send, Sparkles, MessageSquare,
-    Flame, Layers, ExternalLink, Target, TrendingUp
+    Flame, Layers, ExternalLink, Target, TrendingUp, Download
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
@@ -119,6 +119,23 @@ export default function ProjectHome() {
         } catch (error) { toast.error("Failed"); }
     };
 
+    // Shortcut Listeners
+    useEffect(() => {
+        const onOpenTask = () => setTaskDialogOpen(true);
+        const onOpenDoc = () => setDocDialogOpen(true);
+        const onUpload = () => document.getElementById('quick-up')?.click();
+
+        window.addEventListener('open-new-task', onOpenTask);
+        window.addEventListener('open-new-doc', onOpenDoc);
+        window.addEventListener('trigger-upload', onUpload);
+
+        return () => {
+            window.removeEventListener('open-new-task', onOpenTask);
+            window.removeEventListener('open-new-doc', onOpenDoc);
+            window.removeEventListener('trigger-upload', onUpload);
+        };
+    }, []);
+
     const handleUpload = async (e) => {
         const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
@@ -130,6 +147,32 @@ export default function ProjectHome() {
             } catch (err) { toast.error("Failed"); }
         };
         if (file.type.startsWith('text/') || file.name.match(/\.(md|js|jsx|json)$/)) reader.readAsText(file); else reader.readAsDataURL(file);
+    };
+
+    // Pinned Preview State
+    const [previewFile, setPreviewFile] = useState(null);
+
+    const handleDownload = (file) => {
+        let blob;
+        if (file.content.startsWith('data:')) {
+            const arr = file.content.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+            blob = new Blob([u8arr], { type: mime });
+        } else {
+            blob = new Blob([file.content], { type: 'text/plain' });
+        }
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
     };
 
     if (!project) return (
@@ -151,8 +194,8 @@ export default function ProjectHome() {
 
     return (
         <div className="h-full overflow-y-auto">
-            {/* Subtle gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-accent/[0.03] pointer-events-none" />
+            {/* Enhanced Gradient Background */}
+            {/* Enhanced Gradient Background - Moved to Layout.js */}
 
             <div className="relative p-6 lg:p-8 space-y-5 pb-28">
 
@@ -207,7 +250,7 @@ export default function ProjectHome() {
                                     <Input
                                         value={aiMessage}
                                         onChange={(e) => setAiMessage(e.target.value)}
-                                        placeholder="Ask anything about your project..."
+                                        placeholder="Ask anything about your project... (Alt+Shift+A)"
                                         className="h-12 pl-4 pr-14 text-sm bg-background/50 border-white/10 rounded-2xl focus-visible:ring-primary/50"
                                         disabled={aiLoading}
                                     />
@@ -407,7 +450,7 @@ export default function ProjectHome() {
                         </CardContent>
                     </Card>
 
-                    {/* Activity Feed */}
+                    {/* Activity Feed - Clickable Items */}
                     <Card className="rounded-xl bg-secondary/20 border-white/10">
                         <CardHeader className="pb-2 pt-4 px-4">
                             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
@@ -419,11 +462,18 @@ export default function ProjectHome() {
                             <ScrollArea className="h-[180px]">
                                 <div className="px-2 space-y-0">
                                     {recentActivity.slice(0, 10).map((act, i) => (
-                                        <div key={i} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+                                        <button
+                                            key={i}
+                                            onClick={() => {
+                                                if (act.type === 'file') navigate(`/project/${projectId}/editor/${act.item.id}`);
+                                                else if (act.type === 'task') navigate(`/project/${projectId}/tasks`);
+                                            }}
+                                            className="w-full text-left flex items-center gap-3 py-2 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded-lg transition-colors group"
+                                        >
                                             <div className={`h-1.5 w-1.5 rounded-full ${act.type === 'task' ? 'bg-green-500' : 'bg-primary'}`} />
-                                            <span className="text-sm truncate flex-1">{act.item.name || act.item.title}</span>
+                                            <span className="text-sm truncate flex-1 group-hover:text-primary transition-colors">{act.item.name || act.item.title}</span>
                                             <span className="text-[10px] text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(act.date), { addSuffix: false })}</span>
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
                             </ScrollArea>
@@ -450,7 +500,7 @@ export default function ProjectHome() {
                                 stats.highPriorityFiles.map(file => (
                                     <button
                                         key={file.id}
-                                        onClick={() => navigate(`/project/${projectId}/editor/${file.id}`)}
+                                        onClick={() => setPreviewFile(file)}
                                         className="flex-shrink-0 w-32 p-3 rounded-2xl bg-secondary/30 border border-white/10 hover:border-primary/30 transition-all hover:-translate-y-0.5 text-left"
                                     >
                                         <div className="flex items-start justify-between mb-2">
@@ -480,7 +530,7 @@ export default function ProjectHome() {
                     <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
                         <DialogTrigger asChild>
                             <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4">
-                                <CheckCircle2 className="h-4 w-4 mr-2" /> Task
+                                <CheckCircle2 className="h-4 w-4 mr-2" /> Task <span className="ml-2 text-[10px] opacity-50 font-mono">N</span>
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
@@ -497,7 +547,7 @@ export default function ProjectHome() {
                     <Dialog open={docDialogOpen} onOpenChange={setDocDialogOpen}>
                         <DialogTrigger asChild>
                             <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4">
-                                <FileText className="h-4 w-4 mr-2" /> Doc
+                                <FileText className="h-4 w-4 mr-2" /> Doc <span className="ml-2 text-[10px] opacity-50 font-mono">D</span>
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
@@ -523,11 +573,38 @@ export default function ProjectHome() {
                     <div className="w-px h-6 bg-white/10" />
 
                     <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4" onClick={() => document.getElementById('quick-up')?.click()}>
-                        <Upload className="h-4 w-4 mr-2" /> Upload
+                        <Upload className="h-4 w-4 mr-2" /> Upload <span className="ml-2 text-[10px] opacity-50 font-mono">U</span>
                     </Button>
                     <input id="quick-up" type="file" className="hidden" onChange={handleUpload} />
                 </div>
             </div>
+
+            {/* Preview Modal for Pinned Items */}
+            <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
+                <DialogContent className="max-w-3xl h-[80vh] flex flex-col rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-mono">{previewFile?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 bg-black/50 rounded-xl border border-white/10 p-4 overflow-auto flex items-center justify-center">
+                        {previewFile?.type === 'asset' && previewFile.content.startsWith('data:image') ? (
+                            <img src={previewFile.content} alt={previewFile.name} className="max-w-full max-h-full rounded-lg" />
+                        ) : (
+                            <pre className="w-full h-full text-left font-mono text-sm whitespace-pre-wrap">
+                                {previewFile?.content || 'No content.'}
+                            </pre>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" className="rounded-xl" onClick={() => setPreviewFile(null)}>Close</Button>
+                        <Button variant="secondary" className="rounded-xl" onClick={() => handleDownload(previewFile)}>
+                            <Download className="h-4 w-4 mr-2" /> Download
+                        </Button>
+                        <Button className="rounded-xl" onClick={() => { setPreviewFile(null); navigate(`/project/${projectId}/editor/${previewFile.id}`); }}>
+                            <ExternalLink className="h-4 w-4 mr-2" /> Open Editor
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

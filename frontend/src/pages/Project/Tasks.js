@@ -19,6 +19,9 @@ import {
 } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import SmartInput from '../../components/SmartInput';
+import SmartText from '../../components/SmartText';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function ProjectTasks() {
     const { projectId } = useParams();
@@ -538,75 +541,108 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
         setIsEditing(false);
     };
 
-    const cyclePriority = () => {
+    const cyclePriority = (e) => {
+        e?.stopPropagation();
         const cycle = { low: 'medium', medium: 'high', high: 'low' };
         onUpdate(task.id, { priority: cycle[task.priority] || 'medium' });
     };
 
-    const cycleImportance = () => {
+    const cycleImportance = (e) => {
+        e?.stopPropagation();
         const cycle = { low: 'medium', medium: 'high', high: 'low' };
         onUpdate(task.id, { importance: cycle[task.importance] || 'medium' });
     };
 
-    const statusColors = {
-        'todo': 'bg-muted text-muted-foreground',
-        'in-progress': 'bg-accent/20 text-accent',
-        'done': 'bg-green-500/20 text-green-500'
-    };
-
     return (
-        <div className={`grid grid-cols-12 px-4 py-3 items-center hover:bg-white/5 transition-colors group ${task.status === 'done' ? 'opacity-50' : ''}`}>
-            <div className="col-span-1">
-                <button onClick={onToggle} className="p-1">
-                    {task.status === 'done'
-                        ? <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground hover:border-primary transition-colors" />
-                    }
-                </button>
-            </div>
-            <div className="col-span-5">
-                {isEditing ? (
-                    <Input
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={handleSave}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setIsEditing(false); }}
-                        className="h-8 text-sm bg-transparent border-white/10"
-                        autoFocus
-                    />
-                ) : (
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className={`text-left text-sm font-medium hover:text-primary transition-colors ${task.status === 'done' ? 'line-through' : ''}`}
-                    >
-                        {task.title}
+        <div className={`hover:bg-white/5 transition-colors group ${task.status === 'done' ? 'opacity-50' : ''}`}>
+            <div className="grid grid-cols-12 px-4 py-3 items-start">
+                <div className="col-span-1 pt-0.5">
+                    <button onClick={onToggle} className="p-1">
+                        {task.status === 'done'
+                            ? <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground hover:border-primary transition-colors" />
+                        }
                     </button>
-                )}
-            </div>
-            <div className="col-span-2">
-                <button onClick={cyclePriority} title="Click to change priority">
-                    <PriorityBadge priority={task.priority} label="P" clickable />
-                </button>
-            </div>
-            <div className="col-span-2">
-                <button onClick={cycleImportance} title="Click to change importance">
-                    <ImportanceBadge importance={task.importance} clickable />
-                </button>
-            </div>
-            <div className="col-span-1">
-                <span className={`text-[10px] font-medium uppercase px-2 py-1 rounded-lg ${statusColors[task.status]}`}>
-                    {task.status.replace('-', ' ')}
-                </span>
-            </div>
-            <div className="col-span-1 text-right">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all"
-                    onClick={onDelete}
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
+                </div>
+                <div className="col-span-5 pr-4">
+                    {isEditing ? (
+                        <div>
+                            <SmartInput
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={handleSave}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setIsEditing(false); }}
+                                className="h-8 text-sm bg-transparent border-white/10 w-full"
+                                autoFocus
+                            />
+                            <div className="flex gap-1.5 mt-1.5">
+                                <button onClick={cyclePriority} title="Priority"><PriorityBadge priority={task.priority} label="P" clickable /></button>
+                                <button onClick={cycleImportance} title="Importance"><ImportanceBadge importance={task.importance} clickable /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <div
+                                onClick={() => setIsEditing(true)}
+                                className={`text-left text-sm font-medium w-full cursor-text ${task.status === 'done' ? 'line-through' : ''}`}
+                            >
+                                <span className="inline">
+                                    <SmartText text={task.title} className="inline" />
+                                </span>
+
+                                {/* Inline Tags */}
+                                <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
+                                    <button onClick={cyclePriority} title="Priority" className="inline-flex"><PriorityBadge priority={task.priority} label="P" clickable /></button>
+                                    <button onClick={cycleImportance} title="Importance" className="inline-flex"><ImportanceBadge importance={task.importance} clickable /></button>
+                                </span>
+                            </div>
+
+                            {/* Notes in List View */}
+                            <div className="pl-0">
+                                <TaskNotes task={task} onUpdate={onUpdate} />
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {/* Hide old columns for P/I since they are now inline */}
+                <div className="col-span-2 text-xs text-muted-foreground pt-1.5">
+                    {/* Placeholder to keep grid alignment or maybe just remove these columns? 
+                         User didn't explicitly ask to remove columns, but asked for inline style.
+                         Let's keep the grid structure for now but maybe just empty these cells or show something else.
+                         Actually, let's just leave them as alternative controls or remove them to duplicate?
+                         "move the priority and importance tags to the same line as the task name"
+                         This implies removing the separate columns.
+                         BUT, ListView header still has them.
+                         For now I will duplicate them or just leave blank?
+                         Let's leave them for now to avoid breaking the header alignment, but maybe render nothing?
+                         Or render duplicate?
+                         Let's render duplicate for clarity in this specific view OR just hide.
+                         User said "move to same line". So likely doesn't want them in separate columns.
+                         However, changing the GRID columns requires changing the Header too. I won't touch the header for now to avoid big refactor.
+                         I'll just render nothing in these columns.
+                     */}
+                </div>
+                <div className="col-span-2 pt-1.5">
+                    {/* Empty for Importance */}
+                </div>
+                <div className="col-span-1 pt-1.5">
+                    <span className={`text-[10px] font-medium uppercase px-2 py-1 rounded-lg ${task.status === 'todo' ? 'bg-muted text-muted-foreground' :
+                            task.status === 'in-progress' ? 'bg-accent/20 text-accent' :
+                                'bg-green-500/20 text-green-500'
+                        }`}>
+                        {task.status.replace('-', ' ')}
+                    </span>
+                </div>
+                <div className="col-span-1 text-right pt-0.5">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all"
+                        onClick={() => onDelete(task.id)}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
         </div>
     );
@@ -658,11 +694,6 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
         >
             <CardContent className={compact ? 'p-2' : 'p-3'}>
                 <div className="flex items-start gap-2">
-                    {/* Drag Handle */}
-                    <div {...attributes} {...listeners} className="mt-1 cursor-grab opacity-0 group-hover:opacity-50 hover:opacity-100 transition-opacity">
-                        <GripVertical className="h-3 w-3" />
-                    </div>
-
                     {/* Checkbox */}
                     {onToggle && (
                         <button
@@ -680,45 +711,74 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                         {isEditing ? (
-                            <Input
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                onBlur={handleSave}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSave();
-                                    if (e.key === 'Escape') { setEditValue(task.title); setIsEditing(false); }
-                                }}
-                                className="h-6 text-sm p-0 bg-transparent border-0 border-b border-primary/50 rounded-none focus-visible:ring-0"
-                                autoFocus
-                                onPointerDown={(e) => e.stopPropagation()}
-                            />
+                            <div>
+                                <SmartInput
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onBlur={handleSave}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSave();
+                                        if (e.key === 'Escape') { setEditValue(task.title); setIsEditing(false); }
+                                    }}
+                                    className="h-6 text-sm p-0 bg-transparent border-0 border-b border-primary/50 rounded-none focus-visible:ring-0 w-full"
+                                    autoFocus
+                                />
+                                <div className="flex gap-1.5 mt-1.5">
+                                    <button onClick={cyclePriority} onPointerDown={(e) => e.stopPropagation()} title="Priority">
+                                        <PriorityBadge priority={task.priority} label="P" clickable />
+                                    </button>
+                                    <button onClick={cycleImportance} onPointerDown={(e) => e.stopPropagation()} title="Importance">
+                                        <ImportanceBadge importance={task.importance} clickable />
+                                    </button>
+                                </div>
+                            </div>
                         ) : (
-                            <button
+                            <div
                                 onClick={() => onUpdate && setIsEditing(true)}
                                 onPointerDown={(e) => e.stopPropagation()}
-                                className={`text-left text-sm font-medium truncate w-full hover:text-primary transition-colors ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+                                className={`text-left text-sm font-medium w-full cursor-text ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
                             >
-                                {task.title}
-                            </button>
+                                <span className="inline">
+                                    <SmartText text={task.title} className="inline" />
+                                </span>
+
+                                {/* Inline Tags */}
+                                <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
+                                    <button
+                                        onClick={cyclePriority}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        title="Click to change priority"
+                                        className="inline-flex"
+                                    >
+                                        <PriorityBadge priority={task.priority} label="P" clickable />
+                                    </button>
+                                    <button
+                                        onClick={cycleImportance}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        title="Click to change importance"
+                                        className="inline-flex"
+                                    >
+                                        <ImportanceBadge importance={task.importance} clickable />
+                                    </button>
+                                </span>
+                            </div>
                         )}
 
-                        {/* Quick Priority & Importance Toggles */}
-                        <div className="flex gap-1.5 mt-1.5">
-                            <button
-                                onClick={cyclePriority}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                title="Click to change priority"
-                            >
-                                <PriorityBadge priority={task.priority} label="P" clickable />
-                            </button>
-                            <button
-                                onClick={cycleImportance}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                title="Click to change importance"
-                            >
-                                <ImportanceBadge importance={task.importance} clickable />
-                            </button>
-                        </div>
+                        {/* Notes Section */}
+                        <TaskNotes
+                            task={task}
+                            onUpdate={onUpdate}
+                            isOverlay={isOverlay}
+                        />
+
+                        {!compact && (
+                            /* Quick Priority & Importance Toggles - Only show in full view if needed, or keep them? 
+                               User asked for "notes and smart references". 
+                               The code I see in line 733 in previous view showed TaskNotes inside !compact.
+                               Let's just remove the condition.
+                            */
+                            null
+                        )}
                     </div>
 
                     {/* Delete - Bigger and more visible */}
@@ -738,6 +798,78 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
     );
 }
 
+function TaskNotes({ task, onUpdate, isOverlay }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [noteValue, setNoteValue] = useState(task.description || '');
+    const [showFullNotes, setShowFullNotes] = useState(false);
+
+    const hasNotes = !!task.description;
+    const MAX_LENGTH = 120;
+    const isLong = task.description && task.description.length > MAX_LENGTH;
+
+    const handleSave = () => {
+        if (noteValue !== task.description) {
+            onUpdate?.(task.id, { description: noteValue });
+        }
+        setIsEditing(false);
+    };
+
+    if (isOverlay) return null; // Don't show complex notes in drag overlay
+
+    return (
+        <div className="mt-2" onPointerDown={(e) => e.stopPropagation()}>
+            {!isExpanded && !hasNotes ? (
+                <button
+                    onClick={() => { setIsExpanded(true); setIsEditing(true); }}
+                    className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                >
+                    <Plus className="h-3 w-3" /> Add notes
+                </button>
+            ) : (
+                <div className="text-xs">
+                    {!isEditing ? (
+                        <div className="group/notes cursor-pointer">
+                            <div
+                                onClick={() => setIsEditing(true)}
+                                className="text-muted-foreground/80 hover:text-foreground transition-colors inline"
+                            >
+                                <SmartText
+                                    text={!showFullNotes && isLong ? task.description.slice(0, MAX_LENGTH) + '...' : task.description}
+                                    className="inline"
+                                />
+                                {isLong && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowFullNotes(!showFullNotes); }}
+                                        className="text-[10px] text-primary hover:underline ml-1 inline font-medium align-baseline"
+                                    >
+                                        {showFullNotes ? 'Show less' : 'Show more'}
+                                    </button>
+                                )}
+                            </div>
+                            {!task.description && <span className="text-muted-foreground italic" onClick={() => setIsEditing(true)}>Empty notes...</span>}
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <SmartInput
+                                value={noteValue}
+                                onChange={(e) => setNoteValue(e.target.value)}
+                                className="w-full text-xs bg-black/20 border-white/10 rounded-lg min-h-[60px] p-2 align-top"
+                                placeholder="Add notes... (@ to reference files)"
+                                autoFocus
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => { setIsEditing(false); setNoteValue(task.description || ''); if (!task.description) setIsExpanded(false); }} className="text-[10px] hover:underline">Cancel</button>
+                                <button onClick={handleSave} className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded hover:bg-primary/30">Save</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // Always visible inline task add
 function InlineTaskAdd({ onAdd, placeholder = 'Add a task...', compact = false }) {
     const [value, setValue] = useState('');
@@ -753,18 +885,17 @@ function InlineTaskAdd({ onAdd, placeholder = 'Add a task...', compact = false }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="mt-2">
+        <form onSubmit={handleSubmit} className="mt-2 text-left">
             <div className={`flex items-center gap-2 rounded-xl border transition-all ${isFocused ? 'border-primary/50 bg-primary/5' : 'border-dashed border-white/10 hover:border-white/20'
                 } ${compact ? 'p-1.5' : 'p-2'}`}>
                 <Plus className={`flex-shrink-0 text-muted-foreground ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
-                <input
-                    ref={inputRef}
+                <SmartInput
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     placeholder={placeholder}
-                    className={`flex-1 bg-transparent outline-none placeholder:text-muted-foreground/50 ${compact ? 'text-xs' : 'text-sm'}`}
+                    className={`flex-1 bg-transparent outline-none placeholder:text-muted-foreground/50 border-none h-auto p-0 focus-visible:ring-0 ${compact ? 'text-xs' : 'text-sm'}`}
                 />
                 {value.trim() && (
                     <Button type="submit" size="sm" className={`rounded-lg ${compact ? 'h-6 px-2 text-xs' : 'h-7 px-3'}`}>

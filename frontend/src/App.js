@@ -12,6 +12,7 @@ import ProjectTasks from './pages/Project/Tasks';
 import ProjectFiles from './pages/Project/Files';
 import ProjectSettings from './pages/Project/Settings'; // Import Settings
 import ProjectChat from './pages/Project/Chat';
+import ProjectOnboarding from './pages/Project/Onboarding';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -31,32 +32,41 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            
-            <Route 
-              path="/dashboard" 
+
+            <Route
+              path="/dashboard"
               element={
                 <PrivateRoute>
                   <Dashboard />
                 </PrivateRoute>
-              } 
+              }
             />
-            
-            <Route 
-                path="/project/:projectId"
-                element={
-                    <PrivateRoute>
-                        <ProjectLayout />
-                    </PrivateRoute>
-                }
+
+            <Route
+              path="/project/:projectId/onboarding"
+              element={
+                <PrivateRoute>
+                  <ProjectOnboarding />
+                </PrivateRoute>
+              }
+            />
+
+            <Route
+              path="/project/:projectId"
+              element={
+                <PrivateRoute>
+                  <ProjectLayout />
+                </PrivateRoute>
+              }
             >
-                <Route index element={<Navigate to="home" replace />} />
-                <Route path="home" element={<ProjectHome />} />
-                <Route path="chat" element={<ProjectChat />} />
-                <Route path="files" element={<ProjectFiles />} />
-                <Route path="editor" element={<Workspace />} />
-                <Route path="editor/:fileId" element={<Workspace />} />
-                <Route path="tasks" element={<ProjectTasks />} />
-                <Route path="settings" element={<ProjectSettings />} /> {/* Added Route */}
+              <Route index element={<Navigate to="home" replace />} />
+              <Route path="home" element={<ProjectHome />} />
+              <Route path="chat" element={<ProjectChat />} />
+              <Route path="files" element={<ProjectFiles />} />
+              <Route path="editor" element={<Workspace />} />
+              <Route path="editor/:fileId" element={<Workspace />} />
+              <Route path="tasks" element={<ProjectTasks />} />
+              <Route path="settings" element={<ProjectSettings />} /> {/* Added Route */}
             </Route>
 
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
