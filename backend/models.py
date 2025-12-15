@@ -33,6 +33,8 @@ class ProjectModel(BaseModel):
     status: str = "planning" 
     tags: List[str] = []
     created_at: datetime = Field(default_factory=datetime.now)
+    icon: str = "" # Base64 image
+    links: List[dict] = [] # [{'title': 'AI Studio', 'url': '...', 'type': 'ai-studio'}]
     links: List[dict] = [] # [{'title': 'AI Studio', 'url': '...'}]
     last_edited: datetime = Field(default_factory=datetime.now)
 
