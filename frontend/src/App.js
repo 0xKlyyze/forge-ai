@@ -46,12 +46,12 @@ function App() {
                 element={
                     <PrivateRoute>
                         <ProjectLayout />
-                <Route path="chat" element={<ProjectChat />} />
                     </PrivateRoute>
                 }
             >
                 <Route index element={<Navigate to="home" replace />} />
                 <Route path="home" element={<ProjectHome />} />
+                <Route path="chat" element={<ProjectChat />} />
                 <Route path="files" element={<ProjectFiles />} />
                 <Route path="editor" element={<Workspace />} />
                 <Route path="editor/:fileId" element={<Workspace />} />
