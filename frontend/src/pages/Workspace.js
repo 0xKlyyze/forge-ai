@@ -19,8 +19,8 @@ export default function Workspace() {
 
   useEffect(() => {
     fetchProject();
-    fetchFiles();
-  }, [projectId]);
+    if (fileId) fetchFile();
+  }, [projectId, fileId]);
 
   const fetchProject = async () => {
     try {
@@ -32,15 +32,11 @@ export default function Workspace() {
     }
   };
 
-  const fetchFiles = async () => {
+  const fetchFile = async () => {
     try {
       const res = await api.get(`/projects/${projectId}/files`);
-      setFiles(res.data);
-      if (res.data.length > 0 && !activeFile) {
-        // Optional: auto-select first file or readme
-        const readme = res.data.find(f => f.name.toLowerCase().includes('overview'));
-        if (readme) setActiveFile(readme);
-      }
+      const found = res.data.find(f => f.id === fileId);
+      if (found) setActiveFile(found);
     } catch (error) {
       console.error(error);
     }
