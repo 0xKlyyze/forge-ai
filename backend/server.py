@@ -114,6 +114,7 @@ async def list_projects(current_user: dict = Depends(get_current_user)):
             status=project.get("status", "planning"),
             tags=project.get("tags", []),
             links=project.get("links", []),
+            icon=project.get("icon", ""),
             created_at=project["created_at"],
             last_edited=project["last_edited"]
         ))
