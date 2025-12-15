@@ -71,6 +71,7 @@ class ProjectResponse(BaseModel):
     name: str
     status: str
     tags: List[str] = []
+    links: List[dict] = []
     created_at: datetime
     last_edited: datetime
 
