@@ -51,7 +51,8 @@ function App() {
             >
                 <Route index element={<Navigate to="home" replace />} />
                 <Route path="home" element={<ProjectHome />} />
-                <Route path="files" element={<Workspace />} />
+                <Route path="files" element={<ProjectFiles />} />
+                <Route path="editor/:fileId" element={<Workspace />} />
                 <Route path="tasks" element={<ProjectTasks />} />
                 <Route path="settings" element={<div className="p-10 text-white">Settings Coming Soon</div>} />
             </Route>
