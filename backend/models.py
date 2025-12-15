@@ -81,6 +81,7 @@ class FileResponse(BaseModel):
     category: str
     content: str
     priority: int
+    pinned: bool = False
     last_edited: datetime
 
 class TaskResponse(BaseModel):
