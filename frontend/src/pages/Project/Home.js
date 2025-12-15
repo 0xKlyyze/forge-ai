@@ -7,7 +7,8 @@ import { Progress } from '../../components/ui/progress';
 import { 
   FileText, Activity, Star, 
   CheckCircle2, Plus, ArrowRight, Zap,
-  Code, Link as LinkIcon, ExternalLink, Upload, Trash2
+  Code, Link as LinkIcon, ExternalLink, Upload, Trash2,
+  Command, Terminal, Cloud, Database, Cpu
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
@@ -20,21 +21,41 @@ export default function ProjectHome() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
-  const [stats, setStats] = useState({ fileCount: 0, taskCount: 0, completedTasks: 0, highPriorityFiles: [], nextTask: null });
+  const [stats, setStats] = useState({ fileCount: 0, taskCount: 0, completedTasks: 0, highPriorityFiles: [], nextTask: null, overviewFileId: null });
   const [links, setLinks] = useState([]);
   
   // Dialog States
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [serviceUrlDialog, setServiceUrlDialog] = useState(false);
+  const [activeService, setActiveService] = useState(null); // { name, icon, defaultUrl }
 
   // Form States
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newDocName, setNewDocName] = useState('');
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
-  
-  const fileInputRef = useRef(null);
+  const [serviceUrl, setServiceUrl] = useState('');
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+        // Ignore if input focused
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+        if (e.key.toLowerCase() === 'c') setTaskDialogOpen(true);
+        if (e.key.toLowerCase() === 'd') setDocDialogOpen(true);
+        if (e.key.toLowerCase() === 'u') document.getElementById('quick-upload').click();
+        if (e.key === '1') navigate(`/project/${projectId}/home`);
+        if (e.key === '2') navigate(`/project/${projectId}/files`);
+        if (e.key === '3') navigate(`/project/${projectId}/editor`);
+        if (e.key === '4') navigate(`/project/${projectId}/tasks`);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [projectId, navigate]);
 
   useEffect(() => {
     loadData();
@@ -62,12 +83,15 @@ export default function ProjectHome() {
             return 0;
         })[0];
 
+      const overviewFile = files.find(f => f.name.toLowerCase().includes('overview') || f.name.toLowerCase().includes('readme'));
+
       setStats({
         fileCount: files.length,
         taskCount: tasks.length,
         completedTasks: tasks.filter(t => t.status === 'done').length,
         highPriorityFiles: files.filter(f => f.pinned),
-        nextTask
+        nextTask,
+        overviewFileId: overviewFile?.id
       });
 
     } catch (error) {
@@ -115,13 +139,11 @@ export default function ProjectHome() {
   const handleUpload = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
       const reader = new FileReader();
       reader.onload = async (ev) => {
           try {
               let type = 'other';
               if (file.type.startsWith('image/')) type = 'asset';
-              
               await api.post('/files', {
                   project_id: projectId,
                   name: file.name,
@@ -134,54 +156,68 @@ export default function ProjectHome() {
               loadData();
           } catch (err) { toast.error("Upload failed"); }
       };
-      
-      if (file.type.startsWith('text/') || file.name.match(/\.(md|js|jsx|json)$/)) {
-          reader.readAsText(file);
+      if (file.type.startsWith('text/') || file.name.match(/\.(md|js|jsx|json)$/)) reader.readAsText(file);
+      else reader.readAsDataURL(file);
+  };
+
+  const handleServiceClick = (service) => {
+      const link = links.find(l => l.title === service.title);
+      if (link) {
+          window.open(link.url, '_blank');
       } else {
-          reader.readAsDataURL(file);
+          setActiveService(service);
+          setServiceUrl('');
+          setServiceUrlDialog(true);
       }
   };
 
-  const handleAddLink = async (e) => {
-      e.preventDefault();
-      const updatedLinks = [...links, { title: newLinkTitle, url: newLinkUrl }];
+  const saveServiceUrl = async () => {
+      if (!activeService || !serviceUrl) return;
+      const newLink = { title: activeService.title, url: serviceUrl, type: activeService.type };
+      const updatedLinks = [...links, newLink];
       try {
           await api.put(`/projects/${projectId}`, { links: updatedLinks });
           setLinks(updatedLinks);
-          setNewLinkTitle('');
-          setNewLinkUrl('');
-          setLinkDialogOpen(false);
-          toast.success("Link added");
+          setServiceUrlDialog(false);
+          toast.success(`${activeService.title} linked`);
       } catch (error) { toast.error("Failed"); }
   };
 
-  const handleDeleteLink = async (index) => {
-      const updatedLinks = links.filter((_, i) => i !== index);
-      try {
-          await api.put(`/projects/${projectId}`, { links: updatedLinks });
-          setLinks(updatedLinks);
-      } catch (error) { toast.error("Failed"); }
-  }
-
   if (!project) return <div className="p-8 flex items-center justify-center h-full"><div className="animate-pulse text-muted-foreground">Initializing Control Room...</div></div>;
 
-  const completionRate = stats.taskCount > 0 ? (stats.completedTasks / stats.taskCount) * 100 : 0;
+  const SERVICES = [
+      { title: 'Google AI Studio', icon: 'https://ai-bot.cn/wp-content/uploads/2025/08/Google-AI-Studio-icon.png', type: 'ai-studio' },
+      { title: 'Firebase Console', icon: 'https://vectorseek.com/wp-content/uploads/2025/05/Firebase-icon-Logo-PNG-SVG-Vector.png', type: 'firebase' },
+      { title: 'Google Cloud', icon: 'https://logos-world.net/wp-content/uploads/2021/02/Google-Cloud-Emblem.png', type: 'gcp' }
+  ];
 
   return (
     <div className="relative h-full flex flex-col overflow-hidden bg-background/50">
       <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-8 pb-32">
         
-        {/* Compact Header */}
-        <div className="flex items-end justify-between border-b border-white/5 pb-4">
-            <h1 className="text-3xl font-black tracking-tighter text-foreground uppercase">{project.name}</h1>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
-                <span className="flex items-center gap-1"><Activity className="h-3 w-3"/> {Math.round(completionRate)}% VELOCITY</span>
-                <span className="flex items-center gap-1"><FileText className="h-3 w-3"/> {stats.fileCount} ARTIFACTS</span>
+        {/* Header with Project Icon */}
+        <div className="flex items-end justify-between border-b border-white/5 pb-6">
+            <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-2xl bg-secondary/20 border border-white/10 flex items-center justify-center overflow-hidden shadow-lg">
+                    {project.icon ? <img src={project.icon} alt="Icon" className="h-full w-full object-cover" /> : <span className="text-2xl font-black">{project.name.charAt(0)}</span>}
+                </div>
+                <div>
+                    <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase">{project.name}</h1>
+                    <div className="flex items-center gap-4 mt-1">
+                        <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest">Dash • {project.status}</span>
+                    </div>
+                </div>
             </div>
+            
+            {stats.overviewFileId && (
+                <Button variant="outline" className="hidden md:flex gap-2" onClick={() => navigate(`/project/${projectId}/editor/${stats.overviewFileId}`)}>
+                    <FileText className="h-4 w-4" /> Open Overview
+                </Button>
+            )}
         </div>
 
         {/* Hero: Focus Mode */}
-        {stats.nextTask ? (
+        {stats.nextTask && (
             <div className="w-full bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-6 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-30 group-hover:opacity-100 transition-opacity">
                     <Zap className="h-24 w-24 text-primary/10 rotate-12" />
@@ -189,114 +225,81 @@ export default function ProjectHome() {
                 <div className="relative z-10 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                     <div>
                         <div className="flex items-center gap-2 mb-2">
-                            <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Focus</span>
-                            <span className="text-xs text-primary font-mono uppercase">High Priority</span>
+                            <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Current Focus</span>
                         </div>
                         <h3 className="text-2xl font-bold">{stats.nextTask.title}</h3>
                     </div>
-                    <div className="flex gap-2">
-                        <Button className="rounded-full" onClick={() => navigate(`/project/${projectId}/tasks`)}>
-                            Engage <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                        <Button variant="secondary" className="rounded-full" onClick={async () => {
-                            await api.put(`/tasks/${stats.nextTask.id}`, { status: 'done' });
-                            toast.success("Objective Complete");
-                            loadData();
-                        }}>
-                            Complete
-                        </Button>
-                    </div>
+                    <Button className="rounded-full" onClick={() => navigate(`/project/${projectId}/tasks`)}>
+                        Engage <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                 </div>
-            </div>
-        ) : (
-            <div className="w-full bg-secondary/10 border border-white/5 rounded-2xl p-6 flex items-center justify-center gap-4 text-muted-foreground">
-                <CheckCircle2 className="h-6 w-6 text-green-500" />
-                <span>All clear. Initialize new directives.</span>
             </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Quick Links Widget */}
-            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm md:col-span-1 h-full">
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><LinkIcon className="h-4 w-4"/> Quick Links</CardTitle>
-                    <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6"><Plus className="h-3 w-3" /></Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader><DialogTitle>Add Link</DialogTitle></DialogHeader>
-                            <form onSubmit={handleAddLink} className="space-y-4 pt-4">
-                                <div className="space-y-2">
-                                    <Label>Title</Label>
-                                    <Input value={newLinkTitle} onChange={e => setNewLinkTitle(e.target.value)} placeholder="e.g. AI Studio" required />
+            {/* Command Center (Widgets) */}
+            <div className="md:col-span-2 grid grid-cols-3 gap-4">
+                {SERVICES.map((service) => {
+                    const isLinked = links.some(l => l.title === service.title);
+                    return (
+                        <Card 
+                            key={service.title} 
+                            className={`
+                                bg-secondary/10 border-white/5 backdrop-blur-sm cursor-pointer transition-all hover:-translate-y-1 hover:border-primary/30
+                                ${!isLinked ? 'opacity-70 grayscale hover:grayscale-0 hover:opacity-100' : ''}
+                            `}
+                            onClick={() => handleServiceClick(service)}
+                        >
+                            <CardContent className="p-6 flex flex-col items-center justify-center gap-3 text-center h-full">
+                                <img src={service.icon} alt={service.title} className="h-10 w-10 object-contain drop-shadow-lg" />
+                                <div>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider">{service.title}</h4>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{isLinked ? 'Connected' : 'Connect'}</p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>URL</Label>
-                                    <Input value={newLinkUrl} onChange={e => setNewLinkUrl(e.target.value)} placeholder="https://..." required />
-                                </div>
-                                <Button type="submit" className="w-full">Save Link</Button>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-2">
-                        {links.length > 0 ? (
-                            links.map((link, i) => (
-                                <div key={i} className="group flex items-center justify-between p-2 rounded hover:bg-white/5 transition-colors">
-                                    <a href={link.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-medium hover:text-primary truncate flex-1">
-                                        <ExternalLink className="h-3 w-3 opacity-50" /> {link.title}
-                                    </a>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive" onClick={() => handleDeleteLink(i)}>
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-xs text-muted-foreground italic p-2">No links added.</div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
+            </div>
 
-            {/* Pinned Artifacts */}
-            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm md:col-span-2">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500"/> Pinned Artifacts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex gap-4 overflow-x-auto pb-4">
-                        {stats.highPriorityFiles.length > 0 ? (
-                            stats.highPriorityFiles.map(file => (
-                                <div 
-                                    key={file.id} 
-                                    onClick={() => navigate(`/project/${projectId}/editor/${file.id}`)}
-                                    className="flex-shrink-0 w-40 p-4 bg-background/50 rounded-xl border border-white/5 hover:border-primary/50 cursor-pointer transition-all hover:-translate-y-1"
-                                >
-                                    {file.type === 'mockup' ? <Code className="h-6 w-6 text-blue-400 mb-2"/> : <FileText className="h-6 w-6 text-zinc-400 mb-2"/>}
-                                    <p className="font-bold text-xs truncate">{file.name}</p>
-                                    <p className="text-[10px] text-muted-foreground mt-1">{formatDistanceToNow(new Date(file.last_edited))} ago</p>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-sm text-muted-foreground italic p-2">Pin important files for quick access.</div>
-                        )}
+            {/* Stats / Velocity */}
+            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm">
+                <CardContent className="p-6">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4"/> System Status</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/5 rounded-lg p-3">
+                            <div className="text-2xl font-mono font-bold">{stats.fileCount}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase">Artifacts</div>
+                        </div>
+                        <div className="bg-white/5 rounded-lg p-3">
+                            <div className="text-2xl font-mono font-bold">{stats.taskCount}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase">Directives</div>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
         </div>
       </div>
 
+      {/* Service URL Dialog */}
+      <Dialog open={serviceUrlDialog} onOpenChange={setServiceUrlDialog}>
+          <DialogContent>
+              <DialogHeader><DialogTitle>Connect {activeService?.title}</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-4">
+                  <Input placeholder="Paste URL here..." value={serviceUrl} onChange={e => setServiceUrl(e.target.value)} autoFocus />
+                  <Button className="w-full" onClick={saveServiceUrl}>Save Connection</Button>
+              </div>
+          </DialogContent>
+      </Dialog>
+
       {/* Floating Action Dock */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50">
           <div className="flex items-center gap-4 bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl">
-              
               <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
                   <DialogTrigger asChild>
                       <Button variant="ghost" className="flex flex-col gap-1 h-auto py-2 hover:bg-white/10">
                           <CheckCircle2 className="h-5 w-5" />
-                          <span className="text-[10px] uppercase font-bold">New Task</span>
+                          <span className="text-[10px] uppercase font-bold">Task (C)</span>
                       </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -314,11 +317,11 @@ export default function ProjectHome() {
                   <DialogTrigger asChild>
                       <Button variant="ghost" className="flex flex-col gap-1 h-auto py-2 hover:bg-white/10">
                           <FileText className="h-5 w-5" />
-                          <span className="text-[10px] uppercase font-bold">New Doc</span>
+                          <span className="text-[10px] uppercase font-bold">Doc (D)</span>
                       </Button>
                   </DialogTrigger>
                   <DialogContent>
-                      <DialogHeader><DialogTitle>Create Artifact</DialogTitle></DialogHeader>
+                      <DialogHeader><DialogTitle>New Artifact</DialogTitle></DialogHeader>
                       <Tabs defaultValue="create" className="w-full pt-2">
                           <TabsList className="grid w-full grid-cols-2">
                               <TabsTrigger value="create">Create New</TabsTrigger>
@@ -326,16 +329,13 @@ export default function ProjectHome() {
                           </TabsList>
                           <TabsContent value="create">
                               <form onSubmit={handleCreateDoc} className="space-y-4 pt-4">
-                                  <Input placeholder="Filename (e.g. Plan.md)" value={newDocName} onChange={e => setNewDocName(e.target.value)} autoFocus required />
-                                  <Button type="submit" className="w-full">Create Document</Button>
+                                  <Input placeholder="Filename..." value={newDocName} onChange={e => setNewDocName(e.target.value)} autoFocus required />
+                                  <Button type="submit" className="w-full">Create</Button>
                               </form>
                           </TabsContent>
                           <TabsContent value="upload">
                               <div className="space-y-4 pt-4">
-                                  <div className="grid w-full max-w-sm items-center gap-1.5">
-                                      <Label htmlFor="file-upload">File</Label>
-                                      <Input id="file-upload" type="file" onChange={handleUpload} />
-                                  </div>
+                                  <Input type="file" onChange={handleUpload} />
                               </div>
                           </TabsContent>
                       </Tabs>
@@ -346,10 +346,9 @@ export default function ProjectHome() {
 
               <Button variant="ghost" className="flex flex-col gap-1 h-auto py-2 hover:bg-white/10" onClick={() => document.getElementById('quick-upload').click()}>
                   <Upload className="h-5 w-5" />
-                  <span className="text-[10px] uppercase font-bold">Upload</span>
+                  <span className="text-[10px] uppercase font-bold">Up (U)</span>
               </Button>
               <Input id="quick-upload" type="file" className="hidden" onChange={handleUpload} />
-
           </div>
       </div>
     </div>
