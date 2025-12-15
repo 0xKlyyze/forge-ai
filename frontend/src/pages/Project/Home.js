@@ -1,18 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { Card, CardContent } from '../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Progress } from '../../components/ui/progress';
 import { 
-  FileText, Clock, Activity, Star, 
+  FileText, Activity, Star, 
   CheckCircle2, Plus, ArrowRight, Zap,
-  Code, Image as ImageIcon
+  Code, Link as LinkIcon, ExternalLink, Upload, Trash2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Label } from '../../components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
 
 export default function ProjectHome() {
@@ -20,11 +21,20 @@ export default function ProjectHome() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [stats, setStats] = useState({ fileCount: 0, taskCount: 0, completedTasks: 0, highPriorityFiles: [], nextTask: null });
-  const [recentActivity, setRecentActivity] = useState([]);
+  const [links, setLinks] = useState([]);
   
-  // Quick Action State
-  const [isActionOpen, setIsActionOpen] = useState(false);
-  const [quickTaskTitle, setQuickTaskTitle] = useState('');
+  // Dialog States
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [docDialogOpen, setDocDialogOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+
+  // Form States
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newDocName, setNewDocName] = useState('');
+  const [newLinkTitle, setNewLinkTitle] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -39,16 +49,17 @@ export default function ProjectHome() {
       ]);
 
       setProject(projRes.data);
+      setLinks(projRes.data.links || []);
+      
       const files = filesRes.data;
       const tasks = tasksRes.data;
       
-      // Logic for "Next Task" (Highest priority, todo)
       const nextTask = tasks
         .filter(t => t.status === 'todo')
         .sort((a, b) => {
             const prioMap = { high: 3, medium: 2, low: 1 };
             if (prioMap[b.priority] !== prioMap[a.priority]) return prioMap[b.priority] - prioMap[a.priority];
-            return 0; // could add creation date sort
+            return 0;
         })[0];
 
       setStats({
@@ -58,37 +69,99 @@ export default function ProjectHome() {
         highPriorityFiles: files.filter(f => f.pinned),
         nextTask
       });
-      
-      const activity = [
-         ...files.map(f => ({ type: 'file', item: f, date: f.last_edited })),
-         ...tasks.map(t => ({ type: 'task', item: t, date: t.created_at }))
-      ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
-      setRecentActivity(activity);
 
     } catch (error) {
       console.error("Failed to load project home data", error);
     }
   };
 
-  const handleQuickTask = async (e) => {
+  const handleCreateTask = async (e) => {
       e.preventDefault();
       try {
           await api.post('/tasks', {
               project_id: projectId,
-              title: quickTaskTitle,
+              title: newTaskTitle,
               priority: 'medium',
               importance: 'medium',
               status: 'todo',
               quadrant: 'q2'
           });
           toast.success("Task added");
-          setQuickTaskTitle('');
-          setIsActionOpen(false);
+          setNewTaskTitle('');
+          setTaskDialogOpen(false);
           loadData();
-      } catch (error) {
-          toast.error("Failed");
+      } catch (error) { toast.error("Failed"); }
+  };
+
+  const handleCreateDoc = async (e) => {
+      e.preventDefault();
+      let name = newDocName;
+      if (!name.endsWith('.md')) name += '.md';
+      try {
+          await api.post('/files', {
+              project_id: projectId,
+              name,
+              type: 'doc',
+              category: 'Docs',
+              content: '# New Document'
+          });
+          toast.success("Document created");
+          setNewDocName('');
+          setDocDialogOpen(false);
+          loadData();
+      } catch (error) { toast.error("Failed"); }
+  };
+
+  const handleUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+          try {
+              let type = 'other';
+              if (file.type.startsWith('image/')) type = 'asset';
+              
+              await api.post('/files', {
+                  project_id: projectId,
+                  name: file.name,
+                  type,
+                  category: type === 'asset' ? 'Assets' : 'Docs',
+                  content: ev.target.result
+              });
+              toast.success("File uploaded");
+              setDocDialogOpen(false);
+              loadData();
+          } catch (err) { toast.error("Upload failed"); }
+      };
+      
+      if (file.type.startsWith('text/') || file.name.match(/\.(md|js|jsx|json)$/)) {
+          reader.readAsText(file);
+      } else {
+          reader.readAsDataURL(file);
       }
   };
+
+  const handleAddLink = async (e) => {
+      e.preventDefault();
+      const updatedLinks = [...links, { title: newLinkTitle, url: newLinkUrl }];
+      try {
+          await api.put(`/projects/${projectId}`, { links: updatedLinks });
+          setLinks(updatedLinks);
+          setNewLinkTitle('');
+          setNewLinkUrl('');
+          setLinkDialogOpen(false);
+          toast.success("Link added");
+      } catch (error) { toast.error("Failed"); }
+  };
+
+  const handleDeleteLink = async (index) => {
+      const updatedLinks = links.filter((_, i) => i !== index);
+      try {
+          await api.put(`/projects/${projectId}`, { links: updatedLinks });
+          setLinks(updatedLinks);
+      } catch (error) { toast.error("Failed"); }
+  }
 
   if (!project) return <div className="p-8 flex items-center justify-center h-full"><div className="animate-pulse text-muted-foreground">Initializing Control Room...</div></div>;
 
@@ -96,163 +169,187 @@ export default function ProjectHome() {
 
   return (
     <div className="relative h-full flex flex-col overflow-hidden bg-background/50">
-      <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-8 pb-24">
+      <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-8 pb-32">
         
-        {/* Header */}
-        <div className="flex flex-col gap-1">
-            <h2 className="text-xs font-mono text-primary uppercase tracking-widest mb-2">Project Dashboard</h2>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-foreground uppercase">{project.name}</h1>
-            <p className="text-muted-foreground max-w-xl">
-                Status: <span className="text-foreground font-medium">{project.status}</span> • Last active {formatDistanceToNow(new Date(project.last_edited))} ago.
-            </p>
+        {/* Compact Header */}
+        <div className="flex items-end justify-between border-b border-white/5 pb-4">
+            <h1 className="text-3xl font-black tracking-tighter text-foreground uppercase">{project.name}</h1>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
+                <span className="flex items-center gap-1"><Activity className="h-3 w-3"/> {Math.round(completionRate)}% VELOCITY</span>
+                <span className="flex items-center gap-1"><FileText className="h-3 w-3"/> {stats.fileCount} ARTIFACTS</span>
+            </div>
         </div>
 
         {/* Hero: Focus Mode */}
         {stats.nextTask ? (
-            <div className="w-full bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/20 rounded-3xl p-8 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
+            <div className="w-full bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-6 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-30 group-hover:opacity-100 transition-opacity">
                     <Zap className="h-24 w-24 text-primary/10 rotate-12" />
                 </div>
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Current Focus</span>
-                        <span className="text-xs text-primary font-mono uppercase">High Priority</span>
+                <div className="relative z-10 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Focus</span>
+                            <span className="text-xs text-primary font-mono uppercase">High Priority</span>
+                        </div>
+                        <h3 className="text-2xl font-bold">{stats.nextTask.title}</h3>
                     </div>
-                    <h3 className="text-3xl font-bold mb-2">{stats.nextTask.title}</h3>
-                    <p className="text-muted-foreground mb-6 max-w-2xl">{stats.nextTask.description || "No description provided. Execute immediately."}</p>
-                    <div className="flex gap-3">
-                        <Button size="lg" className="rounded-full font-bold" onClick={() => navigate(`/project/${projectId}/tasks`)}>
-                            Start Mission <ArrowRight className="ml-2 h-4 w-4" />
+                    <div className="flex gap-2">
+                        <Button className="rounded-full" onClick={() => navigate(`/project/${projectId}/tasks`)}>
+                            Engage <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                        <Button size="lg" variant="secondary" className="rounded-full" onClick={async () => {
+                        <Button variant="secondary" className="rounded-full" onClick={async () => {
                             await api.put(`/tasks/${stats.nextTask.id}`, { status: 'done' });
                             toast.success("Objective Complete");
                             loadData();
                         }}>
-                            Mark Complete
+                            Complete
                         </Button>
                     </div>
                 </div>
             </div>
         ) : (
-            <div className="w-full bg-secondary/10 border border-white/5 rounded-3xl p-8 flex items-center justify-center flex-col text-center">
-                <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-                <h3 className="text-2xl font-bold">All Clear</h3>
-                <p className="text-muted-foreground">No pending high-priority tasks. Initialize new directives.</p>
+            <div className="w-full bg-secondary/10 border border-white/5 rounded-2xl p-6 flex items-center justify-center gap-4 text-muted-foreground">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <span>All clear. Initialize new directives.</span>
             </div>
         )}
 
-        {/* Grid Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Stats */}
-            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm">
-                <CardContent className="p-6">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4"/> Velocity</h4>
-                    <div className="text-4xl font-mono font-bold mb-2">{Math.round(completionRate)}%</div>
-                    <Progress value={completionRate} className="h-2 mb-4" />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{stats.completedTasks} Complete</span>
-                        <span>{stats.taskCount} Total</span>
+            {/* Quick Links Widget */}
+            <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm md:col-span-1 h-full">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><LinkIcon className="h-4 w-4"/> Quick Links</CardTitle>
+                    <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6"><Plus className="h-3 w-3" /></Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>Add Link</DialogTitle></DialogHeader>
+                            <form onSubmit={handleAddLink} className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label>Title</Label>
+                                    <Input value={newLinkTitle} onChange={e => setNewLinkTitle(e.target.value)} placeholder="e.g. AI Studio" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>URL</Label>
+                                    <Input value={newLinkUrl} onChange={e => setNewLinkUrl(e.target.value)} placeholder="https://..." required />
+                                </div>
+                                <Button type="submit" className="w-full">Save Link</Button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-2">
+                        {links.length > 0 ? (
+                            links.map((link, i) => (
+                                <div key={i} className="group flex items-center justify-between p-2 rounded hover:bg-white/5 transition-colors">
+                                    <a href={link.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-medium hover:text-primary truncate flex-1">
+                                        <ExternalLink className="h-3 w-3 opacity-50" /> {link.title}
+                                    </a>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive" onClick={() => handleDeleteLink(i)}>
+                                        <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-xs text-muted-foreground italic p-2">No links added.</div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Pinned Files */}
+            {/* Pinned Artifacts */}
             <Card className="bg-secondary/10 border-white/5 backdrop-blur-sm md:col-span-2">
-                <CardContent className="p-6">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500"/> Pinned Artifacts</h4>
-                    <div className="flex gap-4 overflow-x-auto pb-2">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500"/> Pinned Artifacts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-4 overflow-x-auto pb-4">
                         {stats.highPriorityFiles.length > 0 ? (
                             stats.highPriorityFiles.map(file => (
                                 <div 
                                     key={file.id} 
                                     onClick={() => navigate(`/project/${projectId}/editor/${file.id}`)}
-                                    className="flex-shrink-0 w-48 p-4 bg-background/50 rounded-xl border border-white/5 hover:border-primary/50 cursor-pointer transition-all hover:-translate-y-1"
+                                    className="flex-shrink-0 w-40 p-4 bg-background/50 rounded-xl border border-white/5 hover:border-primary/50 cursor-pointer transition-all hover:-translate-y-1"
                                 >
                                     {file.type === 'mockup' ? <Code className="h-6 w-6 text-blue-400 mb-2"/> : <FileText className="h-6 w-6 text-zinc-400 mb-2"/>}
-                                    <p className="font-bold text-sm truncate">{file.name}</p>
-                                    <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(file.last_edited))} ago</p>
+                                    <p className="font-bold text-xs truncate">{file.name}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{formatDistanceToNow(new Date(file.last_edited))} ago</p>
                                 </div>
                             ))
                         ) : (
-                            <div className="text-sm text-muted-foreground italic">No artifacts pinned.</div>
+                            <div className="text-sm text-muted-foreground italic p-2">Pin important files for quick access.</div>
                         )}
-                        <div 
-                            onClick={() => navigate(`/project/${projectId}/files`)}
-                            className="flex-shrink-0 w-12 flex items-center justify-center bg-secondary/20 rounded-xl border border-white/5 cursor-pointer hover:bg-secondary/40"
-                        >
-                            <ArrowRight className="h-4 w-4" />
-                        </div>
                     </div>
                 </CardContent>
             </Card>
-        </div>
-
-        {/* Activity Feed */}
-        <div className="space-y-4">
-            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Recent Transmissions</h4>
-            <div className="space-y-2">
-                {recentActivity.map((act, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-secondary/5 rounded-xl border border-white/5">
-                        <div className="flex items-center gap-4">
-                            <div className={`h-2 w-2 rounded-full ${act.type === 'task' ? 'bg-green-500' : 'bg-blue-500'}`} />
-                            <div>
-                                <p className="font-medium text-sm">{act.item.name || act.item.title}</p>
-                                <p className="text-xs text-muted-foreground">{act.type === 'task' ? 'Directive Updated' : 'Artifact Modified'}</p>
-                            </div>
-                        </div>
-                        <span className="text-xs font-mono text-muted-foreground">{formatDistanceToNow(new Date(act.date))} ago</span>
-                    </div>
-                ))}
-            </div>
         </div>
       </div>
 
       {/* Floating Action Dock */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
-              <Dialog open={isActionOpen} onOpenChange={setIsActionOpen}>
+          <div className="flex items-center gap-4 bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl">
+              
+              <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
                   <DialogTrigger asChild>
-                      <Button size="icon" className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 w-12 shadow-lg shadow-primary/20">
-                          <Plus className="h-6 w-6" />
+                      <Button variant="ghost" className="flex flex-col gap-1 h-auto py-2 hover:bg-white/10">
+                          <CheckCircle2 className="h-5 w-5" />
+                          <span className="text-[10px] uppercase font-bold">New Task</span>
                       </Button>
                   </DialogTrigger>
                   <DialogContent>
-                      <DialogHeader>
-                          <DialogTitle>Quick Action</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid grid-cols-2 gap-4 py-4">
-                          <div className="col-span-2 space-y-4">
-                              <h4 className="text-sm font-medium">New Directive</h4>
-                              <form onSubmit={handleQuickTask} className="flex gap-2">
-                                  <Input placeholder="What needs to be done?" value={quickTaskTitle} onChange={e => setQuickTaskTitle(e.target.value)} required />
-                                  <Button type="submit">Add</Button>
-                              </form>
-                          </div>
-                          <div className="col-span-2 h-px bg-white/10 my-2" />
-                          <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => navigate(`/project/${projectId}/files`)}>
-                              <FileText className="h-6 w-6" />
-                              New Document
-                          </Button>
-                          <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => navigate(`/project/${projectId}/files`)}>
-                              <Code className="h-6 w-6" />
-                              New Mockup
-                          </Button>
-                      </div>
+                      <DialogHeader><DialogTitle>New Task</DialogTitle></DialogHeader>
+                      <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
+                          <Input placeholder="Task Title..." value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} autoFocus required />
+                          <Button type="submit" className="w-full">Create</Button>
+                      </form>
                   </DialogContent>
               </Dialog>
-              
-              <div className="w-px h-8 bg-white/10 mx-2" />
-              
-              <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/project/${projectId}/files`)}>
-                  <FileText className="h-5 w-5" />
+
+              <div className="w-px h-8 bg-white/10" />
+
+              <Dialog open={docDialogOpen} onOpenChange={setDocDialogOpen}>
+                  <DialogTrigger asChild>
+                      <Button variant="ghost" className="flex flex-col gap-1 h-auto py-2 hover:bg-white/10">
+                          <FileText className="h-5 w-5" />
+                          <span className="text-[10px] uppercase font-bold">New Doc</span>
+                      </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                      <DialogHeader><DialogTitle>Create Artifact</DialogTitle></DialogHeader>
+                      <Tabs defaultValue="create" className="w-full pt-2">
+                          <TabsList className="grid w-full grid-cols-2">
+                              <TabsTrigger value="create">Create New</TabsTrigger>
+                              <TabsTrigger value="upload">Upload</TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="create">
+                              <form onSubmit={handleCreateDoc} className="space-y-4 pt-4">
+                                  <Input placeholder="Filename (e.g. Plan.md)" value={newDocName} onChange={e => setNewDocName(e.target.value)} autoFocus required />
+                                  <Button type="submit" className="w-full">Create Document</Button>
+                              </form>
+                          </TabsContent>
+                          <TabsContent value="upload">
+                              <div className="space-y-4 pt-4">
+                                  <div className="grid w-full max-w-sm items-center gap-1.5">
+                                      <Label htmlFor="file-upload">File</Label>
+                                      <Input id="file-upload" type="file" onChange={handleUpload} />
+                                  </div>
+                              </div>
+                          </TabsContent>
+                      </Tabs>
+                  </DialogContent>
+              </Dialog>
+
+              <div className="w-px h-8 bg-white/10" />
+
+              <Button variant="ghost" className="flex flex-col gap-1 h-auto py-2 hover:bg-white/10" onClick={() => document.getElementById('quick-upload').click()}>
+                  <Upload className="h-5 w-5" />
+                  <span className="text-[10px] uppercase font-bold">Upload</span>
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/project/${projectId}/editor`)}>
-                  <Code className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/project/${projectId}/tasks`)}>
-                  <CheckCircle2 className="h-5 w-5" />
-              </Button>
+              <Input id="quick-upload" type="file" className="hidden" onChange={handleUpload} />
+
           </div>
       </div>
     </div>
