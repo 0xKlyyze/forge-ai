@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -7,7 +7,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Plus, Trash2, MoreHorizontal, CheckCircle2, GripVertical, Calendar, Flag, Zap } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DndContext, 
@@ -19,10 +19,6 @@ import {
   DragOverlay
 } from '@dnd-kit/core';
 import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -31,9 +27,13 @@ export default function ProjectTasks() {
   const { projectId } = useParams();
   const [tasks, setTasks] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Creation form state
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('medium');
-  const [newTaskDifficulty, setNewTaskDifficulty] = useState('medium');
+  const [newTaskImportance, setNewTaskImportance] = useState('medium');
+  const [newTaskStatus, setNewTaskStatus] = useState('todo');
+
   const [activeId, setActiveId] = useState(null);
 
   useEffect(() => {
@@ -48,25 +48,36 @@ export default function ProjectTasks() {
     fetchTasks();
   }, [projectId]);
 
+  const openCreateDialog = (initialValues = {}) => {
+      setNewTaskTitle('');
+      setNewTaskPriority(initialValues.priority || 'medium');
+      setNewTaskImportance(initialValues.importance || 'medium');
+      setNewTaskStatus(initialValues.status || 'todo');
+      setIsDialogOpen(true);
+  }
+
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
       // Auto-calculate quadrant
       let quadrant = 'q2';
-      if (newTaskPriority === 'high') quadrant = 'q1';
-      if (newTaskPriority === 'low') quadrant = 'q3';
-      if (newTaskPriority === 'low' && newTaskDifficulty === 'easy') quadrant = 'q4';
+      const isUrgent = newTaskPriority === 'high';
+      const isImportant = newTaskImportance === 'high';
+
+      if (isUrgent && isImportant) quadrant = 'q1';
+      else if (!isUrgent && isImportant) quadrant = 'q2';
+      else if (isUrgent && !isImportant) quadrant = 'q3';
+      else quadrant = 'q4';
 
       const res = await api.post('/tasks', {
         project_id: projectId,
         title: newTaskTitle,
         priority: newTaskPriority,
-        difficulty: newTaskDifficulty,
+        importance: newTaskImportance,
         quadrant,
-        status: 'todo'
+        status: newTaskStatus
       });
       setTasks([...tasks, res.data]);
-      setNewTaskTitle('');
       setIsDialogOpen(false);
       toast.success("Directive initialized");
     } catch (error) {
@@ -102,9 +113,7 @@ export default function ProjectTasks() {
   // DnD Sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor)
   );
 
   const handleDragStart = (event) => {
@@ -118,8 +127,6 @@ export default function ProjectTasks() {
 
     const taskId = active.id;
     const task = tasks.find(t => t.id === taskId);
-    
-    // Check if dropped on a container (Kanban Column or Matrix Quadrant)
     const containerId = over.id;
 
     // Kanban Logic
@@ -155,7 +162,7 @@ export default function ProjectTasks() {
                 
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button><Plus className="mr-2 h-4 w-4" /> New Directive</Button>
+                        <Button onClick={() => openCreateDialog()}><Plus className="mr-2 h-4 w-4" /> New Directive</Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
@@ -166,24 +173,24 @@ export default function ProjectTasks() {
                             <Input placeholder="Task Title..." value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} required />
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Priority</label>
+                                    <label className="text-sm font-medium">Priority (Urgency)</label>
                                     <Select value={newTaskPriority} onValueChange={setNewTaskPriority}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="high">High (Critical)</SelectItem>
-                                            <SelectItem value="medium">Medium (Standard)</SelectItem>
-                                            <SelectItem value="low">Low (Optional)</SelectItem>
+                                            <SelectItem value="high">High (Urgent)</SelectItem>
+                                            <SelectItem value="medium">Medium</SelectItem>
+                                            <SelectItem value="low">Low (Not Urgent)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Difficulty</label>
-                                    <Select value={newTaskDifficulty} onValueChange={setNewTaskDifficulty}>
+                                    <label className="text-sm font-medium">Importance</label>
+                                    <Select value={newTaskImportance} onValueChange={setNewTaskImportance}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="hard">Hard (Complex)</SelectItem>
+                                            <SelectItem value="high">High (Important)</SelectItem>
                                             <SelectItem value="medium">Medium</SelectItem>
-                                            <SelectItem value="easy">Easy (Quick)</SelectItem>
+                                            <SelectItem value="low">Low (Not Important)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -205,7 +212,13 @@ export default function ProjectTasks() {
                 <TabsContent value="kanban" className="flex-1 mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                         {['todo', 'in-progress', 'done'].map(status => (
-                            <DroppableContainer key={status} id={status} title={status.replace('-', ' ')} count={tasks.filter(t => t.status === status).length}>
+                            <DroppableContainer 
+                                key={status} 
+                                id={status} 
+                                title={status.replace('-', ' ')} 
+                                count={tasks.filter(t => t.status === status).length}
+                                onAdd={() => openCreateDialog({ status })}
+                            >
                                 {tasks.filter(t => t.status === status).map(task => (
                                     <TaskCard key={task.id} task={task} onToggle={() => toggleDone(task)} onDelete={() => deleteTask(task.id)} />
                                 ))}
@@ -217,22 +230,34 @@ export default function ProjectTasks() {
                 {/* MATRIX */}
                 <TabsContent value="matrix" className="flex-1 mt-6">
                     <div className="grid grid-cols-2 grid-rows-2 gap-4 h-[600px]">
-                        <DroppableContainer id="q1" title="DO FIRST" subtitle="Urgent & Important" className="border-red-500/50 bg-red-900/10">
+                        <DroppableContainer 
+                            id="q1" title="DO FIRST" subtitle="Urgent & Important" className="border-red-500/50 bg-red-900/10"
+                            onAdd={() => openCreateDialog({ priority: 'high', importance: 'high' })}
+                        >
                             {tasks.filter(t => t.quadrant === 'q1').map(task => (
                                 <TaskCard key={task.id} task={task} onToggle={() => toggleDone(task)} onDelete={() => deleteTask(task.id)} />
                             ))}
                         </DroppableContainer>
-                        <DroppableContainer id="q2" title="SCHEDULE" subtitle="Not Urgent & Important" className="border-blue-500/50 bg-blue-900/10">
+                        <DroppableContainer 
+                            id="q2" title="SCHEDULE" subtitle="Not Urgent & Important" className="border-blue-500/50 bg-blue-900/10"
+                            onAdd={() => openCreateDialog({ priority: 'low', importance: 'high' })}
+                        >
                             {tasks.filter(t => t.quadrant === 'q2').map(task => (
                                 <TaskCard key={task.id} task={task} onToggle={() => toggleDone(task)} onDelete={() => deleteTask(task.id)} />
                             ))}
                         </DroppableContainer>
-                        <DroppableContainer id="q3" title="DELEGATE" subtitle="Urgent & Not Important" className="border-yellow-500/50 bg-yellow-900/10">
+                        <DroppableContainer 
+                            id="q3" title="DELEGATE" subtitle="Urgent & Not Important" className="border-yellow-500/50 bg-yellow-900/10"
+                            onAdd={() => openCreateDialog({ priority: 'high', importance: 'low' })}
+                        >
                             {tasks.filter(t => t.quadrant === 'q3').map(task => (
                                 <TaskCard key={task.id} task={task} onToggle={() => toggleDone(task)} onDelete={() => deleteTask(task.id)} />
                             ))}
                         </DroppableContainer>
-                        <DroppableContainer id="q4" title="ELIMINATE" subtitle="Not Urgent & Not Important" className="border-gray-500/50 bg-gray-900/10">
+                        <DroppableContainer 
+                            id="q4" title="ELIMINATE" subtitle="Not Urgent & Not Important" className="border-gray-500/50 bg-gray-900/10"
+                            onAdd={() => openCreateDialog({ priority: 'low', importance: 'low' })}
+                        >
                             {tasks.filter(t => t.quadrant === 'q4').map(task => (
                                 <TaskCard key={task.id} task={task} onToggle={() => toggleDone(task)} onDelete={() => deleteTask(task.id)} />
                             ))}
@@ -247,7 +272,7 @@ export default function ProjectTasks() {
                             <div className="col-span-1">Status</div>
                             <div className="col-span-6">Title</div>
                             <div className="col-span-2">Priority</div>
-                            <div className="col-span-2">Difficulty</div>
+                            <div className="col-span-2">Importance</div>
                             <div className="col-span-1">Actions</div>
                         </div>
                         <div className="divide-y divide-white/5">
@@ -263,7 +288,7 @@ export default function ProjectTasks() {
                                     </div>
                                     <div className="col-span-6 font-medium">{task.title}</div>
                                     <div className="col-span-2"><Badge type="priority" value={task.priority} /></div>
-                                    <div className="col-span-2"><Badge type="difficulty" value={task.difficulty} /></div>
+                                    <div className="col-span-2"><Badge type="importance" value={task.importance} /></div>
                                     <div className="col-span-1 text-right">
                                          <Button variant="ghost" size="icon" onClick={() => deleteTask(task.id)} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
                                     </div>
@@ -282,16 +307,21 @@ export default function ProjectTasks() {
 }
 
 // Sub-components
-function DroppableContainer({ id, title, subtitle, count, children, className }) {
+function DroppableContainer({ id, title, subtitle, count, children, className, onAdd }) {
     const { setNodeRef } = useSortable({ id });
     return (
         <div ref={setNodeRef} className={`flex flex-col rounded-lg border border-white/5 bg-secondary/10 h-full min-h-[200px] overflow-hidden ${className}`}>
-             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/20">
+             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/20 group">
                 <div>
                     <span className="font-mono font-bold uppercase text-sm">{title}</span>
                     {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
                 </div>
-                {count !== undefined && <span className="bg-white/10 text-xs px-2 py-0.5 rounded-full">{count}</span>}
+                <div className="flex items-center gap-2">
+                    {count !== undefined && <span className="bg-white/10 text-xs px-2 py-0.5 rounded-full">{count}</span>}
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={onAdd}>
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
             <div className="p-4 space-y-3 flex-1 overflow-y-auto">
                 {children}
@@ -330,7 +360,7 @@ function TaskCard({ task, onToggle, onDelete, isOverlay }) {
                         <p className={`text-sm font-medium ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>{task.title}</p>
                         <div className="flex gap-2 mt-2">
                              <Badge type="priority" value={task.priority} compact />
-                             <Badge type="difficulty" value={task.difficulty} compact />
+                             <Badge type="importance" value={task.importance} compact />
                         </div>
                     </div>
                     {onDelete && (
@@ -352,9 +382,7 @@ function Badge({ type, value, compact }) {
     const colors = {
         high: 'text-red-400 bg-red-400/10',
         medium: 'text-blue-400 bg-blue-400/10',
-        low: 'text-gray-400 bg-gray-400/10',
-        hard: 'text-orange-400 bg-orange-400/10',
-        easy: 'text-green-400 bg-green-400/10'
+        low: 'text-gray-400 bg-gray-400/10'
     };
     const color = colors[value] || colors.medium;
     return (
