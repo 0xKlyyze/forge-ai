@@ -33,6 +33,7 @@ class ProjectModel(BaseModel):
     status: str = "planning" 
     tags: List[str] = []
     created_at: datetime = Field(default_factory=datetime.now)
+    links: List[dict] = [] # [{'title': 'AI Studio', 'url': '...'}]
     last_edited: datetime = Field(default_factory=datetime.now)
 
 class FileModel(BaseModel):
