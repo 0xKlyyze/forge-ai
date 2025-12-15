@@ -188,6 +188,7 @@ async def create_file(file: FileModel, current_user: dict = Depends(get_current_
         category=new_file["category"],
         content=new_file.get("content", ""),
         priority=new_file.get("priority", 5),
+        pinned=new_file.get("pinned", False),
         last_edited=new_file["last_edited"]
     )
 
