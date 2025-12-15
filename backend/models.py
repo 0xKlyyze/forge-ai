@@ -54,7 +54,7 @@ class TaskModel(BaseModel):
     status: str = "todo" # todo, in-progress, done
     priority: str = "medium" # low, medium, high
     quadrant: str = "q2" # q1 (urgent-important), q2 (not-urgent-important), q3 (urgent-not-important), q4 (not-urgent-not-important)
-    difficulty: str = "medium" # easy, medium, hard
+    importance: str = "medium" # low, medium, high
     linked_files: List[str] = [] # List of file IDs
     due_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
@@ -90,7 +90,7 @@ class TaskResponse(BaseModel):
     status: str
     priority: str
     quadrant: str
-    difficulty: str = "medium"
+    importance: str = "medium"
     linked_files: List[str]
     due_date: Optional[datetime]
     created_at: datetime
