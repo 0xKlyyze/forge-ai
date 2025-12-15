@@ -200,7 +200,7 @@ async def update_file(file_id: str, file_update: dict = Body(...), current_user:
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    update_data = {k: v for k, v in file_update.items() if k in ["name", "content", "category", "type", "priority"]}
+    update_data = {k: v for k, v in file_update.items() if k in ["name", "content", "category", "type", "priority", "pinned"]}
     update_data["last_edited"] = datetime.now()
     
     await db.files.update_one({"_id": ObjectId(file_id)}, {"$set": update_data})
