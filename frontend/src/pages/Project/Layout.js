@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home, 
   FileText, 
@@ -9,9 +9,8 @@ import {
   LogOut
 } from 'lucide-react';
 import { Outlet, useLocation, useNavigate, useParams, NavLink } from 'react-router-dom';
-import { Button } from '../../components/ui/button';
+import api from '../../utils/api';
 
-// Main Navigation Link Component (Adapted from Mockup)
 const MainNavLink = ({ to, label, icon: Icon }) => (
     <NavLink
         to={to}
@@ -29,6 +28,17 @@ const MainNavLink = ({ to, label, icon: Icon }) => (
 export default function ProjectLayout() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [project, setProject] = useState(null);
+
+  useEffect(() => {
+      const fetchProject = async () => {
+          try {
+              const res = await api.get(`/projects/${projectId}`);
+              setProject(res.data);
+          } catch (e) { console.error(e); }
+      };
+      fetchProject();
+  }, [projectId]);
 
   const mainNavItems = [
     { to: `/project/${projectId}/home`, label: 'Home', icon: Home },
@@ -43,11 +53,15 @@ export default function ProjectLayout() {
         {/* Navigation Sidebar */}
         <nav className="w-28 flex-shrink-0 flex flex-col items-center py-6 gap-6 bg-background border-r border-border/40 z-20">
             {/* 1. App Icon */}
-            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 mb-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                <span className="font-mono font-black text-2xl text-primary-foreground">F</span>
+            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 mb-2 cursor-pointer overflow-hidden" onClick={() => navigate('/dashboard')}>
+                {project?.icon ? (
+                    <img src={project.icon} alt="Project Icon" className="w-full h-full object-cover" />
+                ) : (
+                    <span className="font-mono font-black text-2xl text-primary-foreground">{project ? project.name.charAt(0) : 'F'}</span>
+                )}
             </div>
             
-            {/* 2. Primary Action (Placeholder for quick create) */}
+            {/* 2. Primary Action */}
             <button
                 onClick={() => navigate(`/project/${projectId}/tasks`)}
                 title="New Task"

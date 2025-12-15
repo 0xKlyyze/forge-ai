@@ -9,7 +9,8 @@ import ProjectLayout from './pages/Project/Layout';
 import ProjectHome from './pages/Project/Home';
 import Workspace from './pages/Workspace';
 import ProjectTasks from './pages/Project/Tasks';
-import ProjectFiles from './pages/Project/Files'; // Import ProjectFiles
+import ProjectFiles from './pages/Project/Files';
+import ProjectSettings from './pages/Project/Settings'; // Import Settings
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -50,10 +51,10 @@ function App() {
                 <Route index element={<Navigate to="home" replace />} />
                 <Route path="home" element={<ProjectHome />} />
                 <Route path="files" element={<ProjectFiles />} />
-                <Route path="editor" element={<Workspace />} /> {/* Editor Root */}
-                <Route path="editor/:fileId" element={<Workspace />} /> {/* Editor with File */}
+                <Route path="editor" element={<Workspace />} />
+                <Route path="editor/:fileId" element={<Workspace />} />
                 <Route path="tasks" element={<ProjectTasks />} />
-                <Route path="settings" element={<div className="p-10 text-white">Settings Coming Soon</div>} />
+                <Route path="settings" element={<ProjectSettings />} /> {/* Added Route */}
             </Route>
 
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
