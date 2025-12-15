@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Body
-from fastapi.middleware.cors importCORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from database import db
 from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
