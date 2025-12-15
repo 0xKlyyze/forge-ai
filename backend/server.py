@@ -128,6 +128,7 @@ async def get_project(project_id: str, current_user: dict = Depends(get_current_
         name=project["name"],
         status=project.get("status", "planning"),
         tags=project.get("tags", []),
+        links=project.get("links", []),
         created_at=project["created_at"],
         last_edited=project["last_edited"]
     )
