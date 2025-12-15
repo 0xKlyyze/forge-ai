@@ -7,7 +7,7 @@ import {
   ChevronRight 
 } from 'lucide-react';
 import { Outlet, useLocation, useNavigate, useParams, Link } from 'react-router-dom';
-import { Button } from '../components/ui/button';
+import { Button } from '../../components/ui/button';
 
 const NAV_ITEMS = [
   { id: 'home', icon: Home, label: 'Overview', path: 'home' },
