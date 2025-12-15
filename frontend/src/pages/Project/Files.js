@@ -32,17 +32,16 @@ export default function ProjectFiles() {
   const [previewFile, setPreviewFile] = useState(null);
 
   useEffect(() => {
+    const fetchFiles = async () => {
+        try {
+          const res = await api.get(`/projects/${projectId}/files`);
+          setFiles(res.data);
+        } catch (error) {
+          toast.error("Failed to load files");
+        }
+      };
     fetchFiles();
   }, [projectId]);
-
-  const fetchFiles = async () => {
-    try {
-      const res = await api.get(`/projects/${projectId}/files`);
-      setFiles(res.data);
-    } catch (error) {
-      toast.error("Failed to load files");
-    }
-  };
 
   const handleCreateFile = async (e) => {
     e.preventDefault();
