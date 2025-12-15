@@ -11,10 +11,8 @@ import { toast } from 'sonner';
 import { debounce } from 'lodash';
 
 export default function Workspace() {
-  const { projectId } = useParams();
+  const { projectId, fileId } = useParams();
   const navigate = useNavigate();
-  const [file, setFile] = useState(null);
-  const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
   const [project, setProject] = useState(null);
   const [saving, setSaving] = useState(false);
