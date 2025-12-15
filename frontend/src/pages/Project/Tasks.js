@@ -36,16 +36,15 @@ export default function ProjectTasks() {
   const [newTaskDifficulty, setNewTaskDifficulty] = useState('medium');
   const [activeId, setActiveId] = useState(null);
 
-  const fetchTasks = async () => {
-    try {
-      const res = await api.get(`/projects/${projectId}/tasks`);
-      setTasks(res.data);
-    } catch (error) {
-      toast.error("Failed to load tasks");
-    }
-  };
-
   useEffect(() => {
+    const fetchTasks = async () => {
+        try {
+          const res = await api.get(`/projects/${projectId}/tasks`);
+          setTasks(res.data);
+        } catch (error) {
+          toast.error("Failed to load tasks");
+        }
+      };
     fetchTasks();
   }, [projectId]);
 
