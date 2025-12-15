@@ -324,6 +324,40 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
     project = await db.projects.find_one({"_id": ObjectId(existing_task["project_id"]), "user_id": current_user["id"]})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Allowed fields to update
+    allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "importance"]
+    update_data = {k: v for k, v in task_update.items() if k in allowed_keys}
+    
+    await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update_data})
+    updated_task = await db.tasks.find_one({"_id": ObjectId(task_id)})
+    
+    return TaskResponse(
+        id=str(updated_task["_id"]),
+        project_id=updated_task["project_id"],
+        title=updated_task["title"],
+        description=updated_task.get("description", ""),
+        status=updated_task.get("status", "todo"),
+        priority=updated_task.get("priority", "medium"),
+        quadrant=updated_task.get("quadrant", "q2"),
+        importance=updated_task.get("importance", "medium"),
+        linked_files=updated_task.get("linked_files", []),
+        due_date=updated_task.get("due_date"),
+        created_at=updated_task["created_at"]
+    )
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    existing_task = await db.tasks.find_one({"_id": ObjectId(task_id)})
+    if not existing_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    project = await db.projects.find_one({"_id": ObjectId(existing_task["project_id"]), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    await db.tasks.delete_one({"_id": ObjectId(task_id)})
+    return {"detail": "Task deleted"}
+
 # --- CHAT ---
 class ChatRequest(BaseModel):
     message: str
@@ -377,37 +411,3 @@ async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_c
     except Exception as e:
         print(f"Gemini Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-        
-    # Allowed fields to update
-    allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "importance"]
-    update_data = {k: v for k, v in task_update.items() if k in allowed_keys}
-    
-    await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update_data})
-    updated_task = await db.tasks.find_one({"_id": ObjectId(task_id)})
-    
-    return TaskResponse(
-        id=str(updated_task["_id"]),
-        project_id=updated_task["project_id"],
-        title=updated_task["title"],
-        description=updated_task.get("description", ""),
-        status=updated_task.get("status", "todo"),
-        priority=updated_task.get("priority", "medium"),
-        quadrant=updated_task.get("quadrant", "q2"),
-        importance=updated_task.get("importance", "medium"),
-        linked_files=updated_task.get("linked_files", []),
-        due_date=updated_task.get("due_date"),
-        created_at=updated_task["created_at"]
-    )
-
-@app.delete("/api/tasks/{task_id}")
-async def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
-    existing_task = await db.tasks.find_one({"_id": ObjectId(task_id)})
-    if not existing_task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    project = await db.projects.find_one({"_id": ObjectId(existing_task["project_id"]), "user_id": current_user["id"]})
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    await db.tasks.delete_one({"_id": ObjectId(task_id)})
-    return {"detail": "Task deleted"}
