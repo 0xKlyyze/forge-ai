@@ -79,6 +79,7 @@ export default function ProjectLayout() {
 
   const mainNavItems = [
     { to: `/project/${projectId}/home`, label: 'Home', icon: Home },
+    { to: `/project/${projectId}/chat`, label: 'Advisor', icon: Sparkles },
     { to: `/project/${projectId}/files`, label: 'Artifacts', icon: FileText },
     { to: `/project/${projectId}/editor`, label: 'Editor', icon: Code },
     { to: `/project/${projectId}/tasks`, label: 'Mission', icon: CheckSquare },
