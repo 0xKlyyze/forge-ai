@@ -90,6 +90,7 @@ class TaskResponse(BaseModel):
     status: str
     priority: str
     quadrant: str
+    difficulty: str = "medium"
     linked_files: List[str]
     due_date: Optional[datetime]
     created_at: datetime
