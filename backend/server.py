@@ -306,6 +306,7 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
         status=updated_task.get("status", "todo"),
         priority=updated_task.get("priority", "medium"),
         quadrant=updated_task.get("quadrant", "q2"),
+        difficulty=updated_task.get("difficulty", "medium"),
         linked_files=updated_task.get("linked_files", []),
         due_date=updated_task.get("due_date"),
         created_at=updated_task["created_at"]
