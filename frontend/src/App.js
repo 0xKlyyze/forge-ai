@@ -46,6 +46,7 @@ function App() {
                 element={
                     <PrivateRoute>
                         <ProjectLayout />
+                <Route path="chat" element={<ProjectChat />} />
                     </PrivateRoute>
                 }
             >
