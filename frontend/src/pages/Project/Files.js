@@ -7,10 +7,11 @@ import { Card, CardContent, CardFooter } from '../../components/ui/card';
 import { 
   FileText, Code, Image as ImageIcon, File, 
   MoreVertical, ExternalLink, Search, Plus, 
-  LayoutGrid, List as ListIcon, Trash2, Eye, Upload, Download
+  LayoutGrid, List as ListIcon, Trash2, Eye, Upload, Download,
+  Pin
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../../components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
@@ -28,25 +29,35 @@ export default function ProjectFiles() {
   // Creation State
   const [newFileName, setNewFileName] = useState('');
   const [newFileCategory, setNewFileCategory] = useState('Docs');
-  
-  // Upload State
   const [uploadFile, setUploadFile] = useState(null);
-  const fileInputRef = useRef(null);
-
+  
   const [previewFile, setPreviewFile] = useState(null);
 
   useEffect(() => {
-    const fetchFiles = async () => {
-        try {
-          const res = await api.get(`/projects/${projectId}/files`);
-          setFiles(res.data);
-        } catch (error) {
-          toast.error("Failed to load files");
-        }
-      };
     fetchFiles();
   }, [projectId]);
 
+  const fetchFiles = async () => {
+    try {
+      const res = await api.get(`/projects/${projectId}/files`);
+      setFiles(res.data);
+    } catch (error) {
+      toast.error("Failed to load files");
+    }
+  };
+
+  const handleTogglePin = async (file) => {
+      try {
+          const updated = { ...file, pinned: !file.pinned };
+          await api.put(`/files/${file.id}`, { pinned: updated.pinned });
+          setFiles(files.map(f => f.id === file.id ? updated : f));
+          toast.success(updated.pinned ? "Artifact pinned" : "Artifact unpinned");
+      } catch (error) {
+          toast.error("Failed to update pin");
+      }
+  };
+
+  // ... (Create/Delete logic same as before, simplified for brevity here, but I must preserve it)
   const handleCreateFile = async (e) => {
     e.preventDefault();
     let type = 'other';
@@ -55,7 +66,6 @@ export default function ProjectFiles() {
     if (newFileCategory === 'Assets') type = 'asset';
     
     let name = newFileName;
-    // Auto-append extension only for blank files
     if (!uploadFile) {
         if (type === 'doc' && !name.endsWith('.md')) name += '.md';
         if (type === 'mockup' && !name.endsWith('.jsx')) name += '.jsx';
@@ -64,29 +74,14 @@ export default function ProjectFiles() {
     let content = '# New File';
     if (type === 'mockup') content = 'export default function Component() {\n  return <div>New Component</div>\n}';
 
-    // Handle Upload
     if (uploadFile) {
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const result = e.target.result;
-            await submitFile(name, type, newFileCategory, result);
+            await submitFile(name, type, newFileCategory, e.target.result);
         };
-        // Detect text vs binary
-        const isText = uploadFile.type.startsWith('text/') || 
-                       uploadFile.name.endsWith('.js') || 
-                       uploadFile.name.endsWith('.jsx') || 
-                       uploadFile.name.endsWith('.ts') || 
-                       uploadFile.name.endsWith('.tsx') || 
-                       uploadFile.name.endsWith('.md') ||
-                       uploadFile.name.endsWith('.json') ||
-                       uploadFile.name.endsWith('.css') ||
-                       uploadFile.name.endsWith('.html');
-        
-        if (isText) {
-            reader.readAsText(uploadFile);
-        } else {
-            reader.readAsDataURL(uploadFile);
-        }
+        const isText = uploadFile.type.startsWith('text/') || uploadFile.name.match(/\.(js|jsx|ts|tsx|md|json|css|html)$/);
+        if (isText) reader.readAsText(uploadFile);
+        else reader.readAsDataURL(uploadFile);
     } else {
         await submitFile(name, type, newFileCategory, content);
     }
@@ -94,21 +89,13 @@ export default function ProjectFiles() {
 
   const submitFile = async (name, type, category, content) => {
       try {
-        const res = await api.post('/files', {
-            project_id: projectId,
-            name,
-            type,
-            category,
-            content
-        });
+        const res = await api.post('/files', { project_id: projectId, name, type, category, content });
         setFiles([res.data, ...files]);
         setNewFileName('');
         setUploadFile(null);
         setIsDialogOpen(false);
         toast.success("Artifact created");
-      } catch (error) {
-        toast.error("Creation failed");
-      }
+      } catch (error) { toast.error("Creation failed"); }
   }
 
   const handleDelete = async (id) => {
@@ -116,41 +103,31 @@ export default function ProjectFiles() {
       try {
           await api.delete(`/files/${id}`);
           setFiles(files.filter(f => f.id !== id));
-          toast.success("Artifact deleted");
-      } catch (error) {
-          toast.error("Delete failed");
-      }
+          toast.success("Deleted");
+      } catch (error) { toast.error("Failed"); }
   };
 
   const handleDownload = (file) => {
       let blob;
-      let filename = file.name;
-
       if (file.content.startsWith('data:')) {
-          // Base64
           const arr = file.content.split(',');
           const mime = arr[0].match(/:(.*?);/)[1];
           const bstr = atob(arr[1]);
           let n = bstr.length;
           const u8arr = new Uint8Array(n);
-          while(n--){
-              u8arr[n] = bstr.charCodeAt(n);
-          }
+          while(n--){ u8arr[n] = bstr.charCodeAt(n); }
           blob = new Blob([u8arr], {type:mime});
       } else {
-          // Text
           blob = new Blob([file.content], { type: 'text/plain' });
       }
-
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = filename;
+      link.download = file.name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success("Download started");
   };
 
   const getIcon = (type) => {
@@ -162,13 +139,20 @@ export default function ProjectFiles() {
       }
   };
 
-  const filteredFiles = files
+  const sortedFiles = [...files].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return new Date(b.last_edited) - new Date(a.last_edited);
+  });
+
+  const filteredFiles = sortedFiles
     .filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
     .filter(f => filterType === 'All' || f.category === filterType);
 
   return (
     <div className="h-full flex flex-col">
         <div className="flex-1 flex flex-col p-6 lg:p-10 space-y-6 overflow-hidden">
+            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-mono font-bold tracking-tight">ARTIFACTS</h1>
@@ -188,31 +172,18 @@ export default function ProjectFiles() {
 
                     <div className="relative flex-1 md:w-[250px]">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search..." 
-                            className="pl-8 bg-secondary/20 border-white/10"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                        />
+                        <Input placeholder="Search..." className="pl-8 bg-secondary/20 border-white/10" value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     
                     <div className="flex items-center bg-secondary/20 rounded-md border border-white/10 p-1">
-                        <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')}>
-                            <LayoutGrid className="h-4 w-4" />
-                        </Button>
-                        <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')}>
-                            <ListIcon className="h-4 w-4" />
-                        </Button>
+                        <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')}><LayoutGrid className="h-4 w-4" /></Button>
+                        <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')}><ListIcon className="h-4 w-4" /></Button>
                     </div>
                     
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button><Plus className="mr-2 h-4 w-4" /> New</Button>
-                        </DialogTrigger>
+                        <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> New</Button></DialogTrigger>
                         <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Create Artifact</DialogTitle>
-                            </DialogHeader>
+                            <DialogHeader><DialogTitle>Create Artifact</DialogTitle></DialogHeader>
                             <Tabs defaultValue="blank" className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="blank">Create Blank</TabsTrigger>
@@ -224,20 +195,10 @@ export default function ProjectFiles() {
                                     </TabsContent>
                                     <TabsContent value="upload" className="space-y-4">
                                         <div className="flex flex-col gap-2">
-                                            <Input 
-                                                type="file" 
-                                                onChange={(e) => {
-                                                    const file = e.target.files[0];
-                                                    if(file) {
-                                                        setUploadFile(file);
-                                                        setNewFileName(file.name);
-                                                    }
-                                                }} 
-                                            />
+                                            <Input type="file" onChange={(e) => { const file = e.target.files[0]; if(file) { setUploadFile(file); setNewFileName(file.name); } }} />
                                             <p className="text-xs text-muted-foreground">Supports images, code, and text files.</p>
                                         </div>
                                     </TabsContent>
-                                    
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Category</label>
                                         <Select value={newFileCategory} onValueChange={setNewFileCategory}>
@@ -257,12 +218,16 @@ export default function ProjectFiles() {
                 </div>
             </div>
 
+            {/* Grid/List View */}
             <div className="flex-1 overflow-y-auto min-h-0">
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                         {filteredFiles.map(file => (
-                            <Card key={file.id} className="group bg-secondary/10 border-white/5 hover:border-primary/50 transition-all cursor-pointer overflow-hidden relative">
-                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <Card key={file.id} className={`group bg-secondary/10 border-white/5 hover:border-primary/50 transition-all cursor-pointer overflow-hidden relative ${file.pinned ? 'border-l-4 border-l-accent' : ''}`}>
+                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                                    <Button variant="secondary" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleTogglePin(file); }}>
+                                        <Pin className={`h-3 w-3 ${file.pinned ? 'fill-current text-accent' : ''}`} />
+                                    </Button>
                                     <Button variant="secondary" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDownload(file); }}>
                                         <Download className="h-3 w-3" />
                                     </Button>
@@ -277,6 +242,10 @@ export default function ProjectFiles() {
                                             <DropdownMenuItem onClick={() => setPreviewFile(file)}>
                                                 <Eye className="mr-2 h-4 w-4" /> Quick Look
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleTogglePin(file)}>
+                                                <Pin className="mr-2 h-4 w-4" /> {file.pinned ? 'Unpin' : 'Pin'}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
                                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(file.id)}>
                                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
                                             </DropdownMenuItem>
@@ -284,12 +253,10 @@ export default function ProjectFiles() {
                                     </DropdownMenu>
                                 </div>
                                 <CardContent className="flex flex-col items-center justify-center p-8 space-y-4" onClick={() => setPreviewFile(file)}>
-                                    {/* Thumbnail for images */}
+                                    {file.pinned && <div className="absolute top-2 left-2 text-accent"><Pin className="h-3 w-3 fill-current" /></div>}
                                     {file.type === 'asset' && file.content.startsWith('data:image') ? (
                                         <img src={file.content} alt={file.name} className="h-16 w-16 object-cover rounded-md" />
-                                    ) : (
-                                        getIcon(file.type)
-                                    )}
+                                    ) : ( getIcon(file.type) )}
                                     <div className="text-center">
                                         <p className="font-medium text-sm truncate w-[120px]">{file.name}</p>
                                         <p className="text-xs text-muted-foreground">{file.category}</p>
@@ -308,11 +275,15 @@ export default function ProjectFiles() {
                                 <div className="flex items-center gap-4">
                                     {getIcon(file.type)}
                                     <div>
-                                        <p className="font-medium text-sm">{file.name}</p>
+                                        <p className="font-medium text-sm flex items-center gap-2">
+                                            {file.name} 
+                                            {file.pinned && <Pin className="h-3 w-3 text-accent fill-current" />}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">{file.category} • {formatDistanceToNow(new Date(file.last_edited))} ago</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="sm" onClick={() => handleTogglePin(file)}><Pin className={`h-4 w-4 ${file.pinned ? 'fill-current text-accent' : ''}`} /></Button>
                                     <Button variant="ghost" size="sm" onClick={() => handleDownload(file)}><Download className="h-4 w-4" /></Button>
                                     <Button variant="ghost" size="sm" onClick={() => setPreviewFile(file)}>Quick Look</Button>
                                     <Button variant="secondary" size="sm" onClick={() => navigate(`/project/${projectId}/editor/${file.id}`)}>Open Editor</Button>
@@ -326,9 +297,7 @@ export default function ProjectFiles() {
 
             <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
                 <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle className="font-mono">{previewFile?.name}</DialogTitle>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle className="font-mono">{previewFile?.name}</DialogTitle></DialogHeader>
                     <div className="flex-1 bg-black/50 rounded-md border border-white/10 p-4 overflow-auto font-mono text-sm whitespace-pre-wrap flex items-center justify-center">
                         {previewFile?.type === 'asset' && previewFile.content.startsWith('data:image') ? (
                              <img src={previewFile.content} alt={previewFile.name} className="max-w-full max-h-full" />
