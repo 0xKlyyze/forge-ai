@@ -4,14 +4,16 @@ import {
   FileText, 
   CheckSquare, 
   Settings, 
-  ChevronRight 
+  ChevronRight,
+  Code
 } from 'lucide-react';
 import { Outlet, useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 
 const NAV_ITEMS = [
   { id: 'home', icon: Home, label: 'Overview', path: 'home' },
-  { id: 'files', icon: FileText, label: 'Workspace', path: 'files' },
+  { id: 'files', icon: FileText, label: 'Artifacts', path: 'files' },
+  { id: 'editor', icon: Code, label: 'Code Editor', path: 'editor' }, // Added Editor Tab
   { id: 'tasks', icon: CheckSquare, label: 'Tasks', path: 'tasks' },
   { id: 'settings', icon: Settings, label: 'Settings', path: 'settings' }
 ];
@@ -20,7 +22,12 @@ export default function ProjectLayout() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentPath = location.pathname.split('/').pop();
+  // Extract the second segment of the path relative to the project root
+  // e.g., /project/123/editor -> 'editor'
+  // e.g., /project/123/editor/456 -> 'editor'
+  const pathParts = location.pathname.split('/');
+  const projectIndex = pathParts.indexOf('project');
+  const currentPath = pathParts[projectIndex + 2]; 
 
   return (
     <div className="h-screen flex bg-background">
@@ -33,7 +40,7 @@ export default function ProjectLayout() {
         
         <nav className="flex-1 space-y-1 px-2">
           {NAV_ITEMS.map((item) => {
-            const isActive = currentPath === item.path || (item.path === 'home' && currentPath === projectId);
+            const isActive = currentPath === item.path || (item.path === 'home' && !currentPath);
             return (
               <Link 
                 key={item.id} 

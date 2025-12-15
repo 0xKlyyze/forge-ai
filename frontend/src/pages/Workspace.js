@@ -13,41 +13,67 @@ import { debounce } from 'lodash';
 export default function Workspace() {
   const { projectId, fileId } = useParams();
   const navigate = useNavigate();
+  const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
   const [project, setProject] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchProject();
-    if (fileId) fetchFile();
+    fetchData();
   }, [projectId, fileId]);
 
-  const fetchProject = async () => {
+  const fetchData = async () => {
     try {
-      const res = await api.get(`/projects/${projectId}`);
-      setProject(res.data);
-    } catch (error) {
-      toast.error("Failed to load project");
-      navigate('/dashboard');
-    }
-  };
+      const [projRes, filesRes] = await Promise.all([
+        api.get(`/projects/${projectId}`),
+        api.get(`/projects/${projectId}/files`)
+      ]);
+      setProject(projRes.data);
+      setFiles(filesRes.data);
 
-  const fetchFile = async () => {
-    try {
-      const res = await api.get(`/projects/${projectId}/files`);
-      const found = res.data.find(f => f.id === fileId);
-      if (found) setActiveFile(found);
+      if (fileId) {
+        const found = filesRes.data.find(f => f.id === fileId);
+        if (found) setActiveFile(found);
+      } else if (filesRes.data.length > 0 && !activeFile) {
+         // Optional: Auto-select first file if none selected?
+         // setActiveFile(filesRes.data[0]); 
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Failed to load workspace data", error);
     }
   };
 
   const handleCreateFile = async (name, type, category) => {
-    // Moved to ProjectFiles.js
+    try {
+      const res = await api.post('/files', {
+        project_id: projectId,
+        name,
+        type,
+        category,
+        content: type === 'mockup' ? 'export default function Component() {\n  return <div>New Component</div>\n}' : '# New File'
+      });
+      setFiles([...files, res.data]);
+      setActiveFile(res.data);
+      toast.success("File created");
+    } catch (error) {
+      toast.error("Failed to create file");
+    }
   };
 
-  const handleDeleteFile = async (fileId) => {
-     // Moved to ProjectFiles.js
+  const handleDeleteFile = async (id) => {
+      if(!window.confirm("Delete file?")) return;
+      try {
+          await api.delete(`/files/${id}`);
+          const newFiles = files.filter(f => f.id !== id);
+          setFiles(newFiles);
+          if (activeFile && activeFile.id === id) {
+              setActiveFile(null);
+              navigate(`/project/${projectId}/editor`);
+          }
+          toast.success("File deleted");
+      } catch (error) {
+          toast.error("Delete failed");
+      }
   };
 
   // Debounced save
@@ -68,22 +94,25 @@ export default function Workspace() {
   const handleContentChange = (newContent) => {
     if (!activeFile) return;
     
-    // Update local state immediately for UI responsiveness
     const updatedFile = { ...activeFile, content: newContent };
     setActiveFile(updatedFile);
     
-    // Trigger server save
+    // Update in files list to keep sync
+    setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
+    
     saveContent(activeFile.id, newContent);
   };
 
+  const handleFileSelect = (file) => {
+      setActiveFile(file);
+      navigate(`/project/${projectId}/editor/${file.id}`);
+  };
+
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-full flex flex-col bg-background overflow-hidden">
       {/* Header */}
       <header className="h-14 border-b border-border flex items-center px-4 justify-between bg-secondary/10 backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}/files`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
           <h1 className="font-mono font-bold text-sm tracking-tight">{project?.name || 'Loading...'}</h1>
           <span className="text-muted-foreground text-xs px-2 py-0.5 rounded bg-secondary">
              {activeFile ? activeFile.name : 'No file selected'}
@@ -98,9 +127,22 @@ export default function Workspace() {
       {/* Main Workspace */}
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
+          
+          {/* File Browser (Restored) */}
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="border-r border-border bg-secondary/5">
+            <FileBrowser 
+              files={files} 
+              activeFile={activeFile} 
+              onSelect={handleFileSelect} 
+              onCreate={handleCreateFile}
+              onDelete={handleDeleteFile}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle />
 
           {/* Editor Panel */}
-          <ResizablePanel defaultSize={50}>
+          <ResizablePanel defaultSize={40}>
              {activeFile ? (
                <Editor 
                  file={activeFile} 
@@ -108,7 +150,7 @@ export default function Workspace() {
                />
              ) : (
                <div className="h-full flex items-center justify-center text-muted-foreground font-mono text-sm">
-                 Loading file...
+                 Select a file from the explorer.
                </div>
              )}
           </ResizablePanel>
@@ -116,7 +158,7 @@ export default function Workspace() {
           <ResizableHandle />
 
           {/* Preview Panel */}
-          <ResizablePanel defaultSize={50} className="border-l border-border bg-black">
+          <ResizablePanel defaultSize={40} className="border-l border-border bg-black">
              {activeFile ? (
                <Preview file={activeFile} />
              ) : (
