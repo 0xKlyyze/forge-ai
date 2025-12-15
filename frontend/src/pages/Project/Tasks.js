@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Plus, Trash2, GripVertical, AlertCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,8 +13,9 @@ import { toast } from 'sonner';
 export default function ProjectTasks() {
   const { projectId } = useParams();
   const [tasks, setTasks] = useState([]);
-  const [files, setFiles] = useState([]); // For linking
+  const [files, setFiles] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskQuadrant, setNewTaskQuadrant] = useState('q2');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -42,10 +43,11 @@ export default function ProjectTasks() {
         title: newTaskTitle,
         status: 'todo',
         priority: 'medium',
-        quadrant: 'q2'
+        quadrant: newTaskQuadrant
       });
       setTasks([...tasks, res.data]);
       setNewTaskTitle('');
+      setNewTaskQuadrant('q2');
       setIsDialogOpen(false);
       toast.success("Task created");
     } catch (error) {
@@ -54,14 +56,13 @@ export default function ProjectTasks() {
   };
 
   const handleUpdateTask = async (taskId, updates) => {
-      // Optimistic update
       const oldTasks = [...tasks];
       setTasks(tasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
       
       try {
           await api.put(`/tasks/${taskId}`, updates);
       } catch (error) {
-          setTasks(oldTasks); // Revert
+          setTasks(oldTasks);
           toast.error("Update failed");
       }
   };
@@ -92,9 +93,27 @@ export default function ProjectTasks() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>New Task</DialogTitle>
+                    <DialogDescription>Define a new objective for this project.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleCreateTask} className="space-y-4 mt-4">
-                    <Input placeholder="Task title..." value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} required />
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Task Title</label>
+                        <Input placeholder="e.g. Implement Auth" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} required />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Priority Quadrant</label>
+                        <Select value={newTaskQuadrant} onValueChange={setNewTaskQuadrant}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="q1">Q1: Do First (Urgent & Important)</SelectItem>
+                                <SelectItem value="q2">Q2: Schedule (Not Urgent & Important)</SelectItem>
+                                <SelectItem value="q3">Q3: Delegate (Urgent & Not Important)</SelectItem>
+                                <SelectItem value="q4">Q4: Eliminate (Not Urgent & Not Important)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <Button type="submit" className="w-full">Initialize</Button>
                 </form>
             </DialogContent>
@@ -142,7 +161,6 @@ export default function ProjectTasks() {
         {/* EISENHOWER VIEW */}
         <TabsContent value="matrix" className="flex-1 mt-6">
              <div className="grid grid-cols-2 grid-rows-2 gap-4 h-[600px]">
-                 {/* Q1: Urgent & Important */}
                  <Quadrant 
                     title="DO FIRST" 
                     subtitle="Urgent & Important" 
@@ -150,7 +168,6 @@ export default function ProjectTasks() {
                     color="border-red-500/50 bg-red-900/10"
                     onDrop={taskId => handleUpdateTask(taskId, { quadrant: 'q1' })}
                  />
-                 {/* Q2: Not Urgent & Important */}
                  <Quadrant 
                     title="SCHEDULE" 
                     subtitle="Not Urgent & Important" 
@@ -158,7 +175,6 @@ export default function ProjectTasks() {
                     color="border-blue-500/50 bg-blue-900/10"
                     onDrop={taskId => handleUpdateTask(taskId, { quadrant: 'q2' })}
                  />
-                 {/* Q3: Urgent & Not Important */}
                  <Quadrant 
                     title="DELEGATE" 
                     subtitle="Urgent & Not Important" 
@@ -166,7 +182,6 @@ export default function ProjectTasks() {
                     color="border-yellow-500/50 bg-yellow-900/10"
                     onDrop={taskId => handleUpdateTask(taskId, { quadrant: 'q3' })}
                  />
-                 {/* Q4: Not Urgent & Not Important */}
                  <Quadrant 
                     title="ELIMINATE" 
                     subtitle="Not Urgent & Not Important" 
@@ -175,7 +190,6 @@ export default function ProjectTasks() {
                     onDrop={taskId => handleUpdateTask(taskId, { quadrant: 'q4' })}
                  />
              </div>
-             <p className="text-xs text-muted-foreground mt-4 text-center">To move tasks between quadrants, open task details (Drag & Drop coming in Phase 3)</p>
         </TabsContent>
       </Tabs>
     </div>
@@ -194,7 +208,6 @@ function Quadrant({ title, subtitle, tasks, color, onDrop }) {
                     <div key={t.id} className="p-2 bg-black/40 rounded border border-white/5 text-sm flex items-center justify-between">
                         <span>{t.title}</span>
                          <div className="flex gap-1">
-                             {/* Simple quadrant switcher buttons for MVP */}
                              <div className="h-2 w-2 rounded-full bg-current opacity-50" />
                          </div>
                     </div>
