@@ -159,6 +159,7 @@ async def list_files(project_id: str, current_user: dict = Depends(get_current_u
             category=f["category"],
             content=f.get("content", ""),
             priority=f.get("priority", 5),
+            pinned=f.get("pinned", False),
             last_edited=f["last_edited"]
         ))
     return files
