@@ -145,7 +145,7 @@ async def update_project(project_id: str, updates: dict = Body(...), current_use
     if not existing_project:
         raise HTTPException(status_code=404, detail="Project not found")
         
-    allowed = ["name", "status", "tags", "links"]
+    allowed = ["name", "status", "tags", "links", "icon"]
     filtered_updates = {k: v for k, v in updates.items() if k in allowed}
     filtered_updates["last_edited"] = datetime.now()
     
