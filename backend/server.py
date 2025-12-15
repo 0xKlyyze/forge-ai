@@ -158,6 +158,7 @@ async def update_project(project_id: str, updates: dict = Body(...), current_use
         status=updated_project.get("status", "planning"),
         tags=updated_project.get("tags", []),
         links=updated_project.get("links", []),
+        icon=updated_project.get("icon", ""),
         created_at=updated_project["created_at"],
         last_edited=updated_project["last_edited"]
     )
