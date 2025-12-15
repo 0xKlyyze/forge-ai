@@ -275,6 +275,7 @@ async def create_task(task: TaskModel, current_user: dict = Depends(get_current_
         status=new_task.get("status", "todo"),
         priority=new_task.get("priority", "medium"),
         quadrant=new_task.get("quadrant", "q2"),
+        difficulty=new_task.get("difficulty", "medium"),
         linked_files=new_task.get("linked_files", []),
         due_date=new_task.get("due_date"),
         created_at=new_task["created_at"]
