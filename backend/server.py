@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from database import db
+from database import db, get_db, close_mongo_connection
+from contextlib import asynccontextmanager
 from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse, TaskModel, TaskResponse, ChatSessionModel, ChatSessionResponse, ChatSessionListResponse
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
@@ -10,11 +11,21 @@ from chat import generate_response, get_available_models, edit_selection, assess
 from bson import ObjectId
 import os
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await get_db()
+    yield
+    # Shutdown
+    await close_mongo_connection()
+
+app = FastAPI(lifespan=lifespan)
 
 origins = [
     "http://localhost:3000",
     "http://localhost:8000",
+    "https://*.netlify.app",
+    "https://*.run.app",
     "*"
 ]
 

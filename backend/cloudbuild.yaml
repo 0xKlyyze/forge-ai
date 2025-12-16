@@ -1,0 +1,46 @@
+steps:
+  # 1. Build Docker image
+  # Using 'dir' to specify build context as per debugging guidelines
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Build Image
+    dir: 'backend' 
+    args: 
+      - build
+      - -t
+      - asia-northeast1-docker.pkg.dev/$PROJECT_ID/forge-ai/backend:latest
+      - .
+
+  # 2. Push to Artifact Registry
+  # Using Artifact Registry (pkg.dev) instead of deprecated Container Registry (gcr.io)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Push Image
+    args: 
+      - push
+      - asia-northeast1-docker.pkg.dev/$PROJECT_ID/forge-ai/backend:latest
+
+  # 3. Deploy to Cloud Run
+  # Optimized for Free Tier: min-instances=0, max-instances=5, memory=256Mi
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: Deploy to Cloud Run
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - forge-backend
+      - --image=asia-northeast1-docker.pkg.dev/$PROJECT_ID/forge-ai/backend:latest
+      - --region=asia-northeast1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --min-instances=0
+      - --max-instances=5
+      - --memory=256Mi
+      # Secrets should be mounted (assumes secret exists in Secret Manager)
+      # Syntax: ENV_VAR=SECRET_NAME:latest
+      - --set-secrets=MONGO_URL=MONGO_URL:latest
+
+images:
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/forge-ai/backend:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
