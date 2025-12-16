@@ -7,23 +7,33 @@ load_dotenv()
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "forge_db")
 
-class Database:
-    client: AsyncIOMotorClient = None
+# Module-level client - cached for connection reuse in serverless environments
+_client: AsyncIOMotorClient = None
 
-db = Database()
+def _get_client():
+    global _client
+    if _client is None:
+        _client = AsyncIOMotorClient(MONGO_URL)
+    return _client
 
-async def get_db_client():
-    if db.client is None:
-        db.client = AsyncIOMotorClient(MONGO_URL)
-    return db.client
+# The 'db' object used throughout the app - this is the actual database
+# Lazy-initialized on first access
+class _DatabaseProxy:
+    """Proxy class that lazily initializes the MongoDB connection."""
+    
+    def __getattr__(self, name):
+        client = _get_client()
+        return getattr(client[DB_NAME], name)
+
+db = _DatabaseProxy()
 
 async def get_db():
-    if db.client is None:
-        db.client = AsyncIOMotorClient(MONGO_URL)
-    return db.client[DB_NAME]
+    """Get the database instance."""
+    return _get_client()[DB_NAME]
 
 async def close_mongo_connection():
-    if db.client:
-        db.client.close()
-        db.client = None
-
+    """Close the MongoDB connection."""
+    global _client
+    if _client:
+        _client.close()
+        _client = None
