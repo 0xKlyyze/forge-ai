@@ -35,9 +35,9 @@ steps:
       - --min-instances=0
       - --max-instances=5
       - --memory=256Mi
-      # Secrets should be mounted (assumes secret exists in Secret Manager)
+      # Secrets should be mounted (assumes secrets exist in Secret Manager)
       # Syntax: ENV_VAR=SECRET_NAME:latest
-      - --set-secrets=MONGO_URL=MONGO_URL:latest
+      - --set-secrets=MONGO_URL=MONGO_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest
 
 images:
   - asia-northeast1-docker.pkg.dev/$PROJECT_ID/forge-ai/backend:latest
