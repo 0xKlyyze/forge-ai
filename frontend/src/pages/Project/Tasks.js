@@ -15,7 +15,8 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
-    DragOverlay
+    DragOverlay,
+    useDroppable
 } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -67,7 +68,7 @@ export default function ProjectTasks() {
                 quadrant: options.quadrant || quadrant,
                 status
             });
-            setTasks(prev => [...prev, res.data]);
+            setTasks(prev => [res.data, ...prev]);
             toast.success("Task created");
         } catch (error) {
             toast.error("Failed to create task");
@@ -75,6 +76,19 @@ export default function ProjectTasks() {
     };
 
     const updateTask = async (id, updates) => {
+        // Auto-calculate quadrant when priority or importance changes
+        const task = tasks.find(t => t.id === id);
+        if (task && (updates.priority !== undefined || updates.importance !== undefined)) {
+            const newPriority = updates.priority || task.priority;
+            const newImportance = updates.importance || task.importance;
+            const isUrgent = newPriority === 'high';
+            const isImportant = newImportance === 'high';
+            if (isUrgent && isImportant) updates.quadrant = 'q1';
+            else if (!isUrgent && isImportant) updates.quadrant = 'q2';
+            else if (isUrgent && !isImportant) updates.quadrant = 'q3';
+            else updates.quadrant = 'q4';
+        }
+
         const oldTasks = [...tasks];
         setTasks(tasks.map(t => t.id === id ? { ...t, ...updates } : t));
         try {
@@ -121,7 +135,14 @@ export default function ProjectTasks() {
             updateTask(taskId, { status: containerId });
         }
         if (['q1', 'q2', 'q3', 'q4'].includes(containerId) && task.quadrant !== containerId) {
-            updateTask(taskId, { quadrant: containerId });
+            // Map quadrant to priority/importance for consistency
+            const quadrantMap = {
+                q1: { priority: 'high', importance: 'high' },
+                q2: { priority: 'low', importance: 'high' },
+                q3: { priority: 'high', importance: 'low' },
+                q4: { priority: 'low', importance: 'low' }
+            };
+            updateTask(taskId, { quadrant: containerId, ...quadrantMap[containerId] });
         }
     };
 
@@ -145,26 +166,41 @@ export default function ProjectTasks() {
                             </p>
                         </div>
 
-                        {/* View Switcher */}
-                        <div className="flex items-center gap-2 bg-secondary/30 rounded-2xl p-1">
-                            {[
+                        {/* View Switcher with animated sliding pill */}
+                        {(() => {
+                            const views = [
                                 { id: 'kanban', icon: LayoutGrid, label: 'Board' },
                                 { id: 'matrix', icon: Target, label: 'Matrix' },
                                 { id: 'list', icon: List, label: 'List' }
-                            ].map(view => (
-                                <button
-                                    key={view.id}
-                                    onClick={() => setActiveView(view.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeView === view.id
-                                        ? 'bg-primary text-primary-foreground shadow-lg'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                                        }`}
-                                >
-                                    <view.icon className="h-4 w-4" />
-                                    <span className="hidden sm:inline">{view.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                            ];
+                            const activeIndex = views.findIndex(v => v.id === activeView);
+
+                            return (
+                                <div className="relative flex items-center gap-1 bg-secondary/30 rounded-2xl p-1">
+                                    {/* Animated background pill */}
+                                    <div
+                                        className="absolute h-[calc(100%-8px)] rounded-xl bg-primary shadow-lg transition-all duration-300 ease-out"
+                                        style={{
+                                            width: `calc(${100 / views.length}% - 4px)`,
+                                            left: `calc(${activeIndex * (100 / views.length)}% + 4px)`,
+                                        }}
+                                    />
+                                    {views.map((view, index) => (
+                                        <button
+                                            key={view.id}
+                                            onClick={() => setActiveView(view.id)}
+                                            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${activeView === view.id
+                                                ? 'text-primary-foreground'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                                }`}
+                                        >
+                                            <view.icon className={`h-4 w-4 transition-transform duration-200 ${activeView === view.id ? 'scale-110' : ''}`} />
+                                            <span className="hidden sm:inline">{view.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -215,7 +251,7 @@ export default function ProjectTasks() {
                                     title="Do First"
                                     subtitle="Urgent & Important"
                                     color="red"
-                                    tasks={tasks.filter(t => t.quadrant === 'q1')}
+                                    tasks={tasks.filter(t => t.quadrant === 'q1' && t.status !== 'done')}
                                     onCreateTask={(title) => createTask(title, { quadrant: 'q1', priority: 'high', importance: 'high' })}
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
@@ -226,7 +262,7 @@ export default function ProjectTasks() {
                                     title="Schedule"
                                     subtitle="Important, Not Urgent"
                                     color="blue"
-                                    tasks={tasks.filter(t => t.quadrant === 'q2')}
+                                    tasks={tasks.filter(t => t.quadrant === 'q2' && t.status !== 'done')}
                                     onCreateTask={(title) => createTask(title, { quadrant: 'q2', priority: 'low', importance: 'high' })}
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
@@ -237,7 +273,7 @@ export default function ProjectTasks() {
                                     title="Delegate"
                                     subtitle="Urgent, Not Important"
                                     color="amber"
-                                    tasks={tasks.filter(t => t.quadrant === 'q3')}
+                                    tasks={tasks.filter(t => t.quadrant === 'q3' && t.status !== 'done')}
                                     onCreateTask={(title) => createTask(title, { quadrant: 'q3', priority: 'high', importance: 'low' })}
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
@@ -248,7 +284,7 @@ export default function ProjectTasks() {
                                     title="Eliminate"
                                     subtitle="Neither Urgent nor Important"
                                     color="gray"
-                                    tasks={tasks.filter(t => t.quadrant === 'q4')}
+                                    tasks={tasks.filter(t => t.quadrant === 'q4' && t.status !== 'done')}
                                     onCreateTask={(title) => createTask(title, { quadrant: 'q4', priority: 'low', importance: 'low' })}
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
@@ -259,7 +295,7 @@ export default function ProjectTasks() {
 
                         {activeView === 'list' && (
                             <ListView
-                                tasks={tasks}
+                                tasks={tasks.filter(t => t.status !== 'done')}
                                 onToggle={toggleDone}
                                 onDelete={deleteTask}
                                 onUpdate={updateTask}
@@ -282,7 +318,7 @@ export default function ProjectTasks() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, onCreateTask, onToggle, onDelete, onUpdate }) {
-    const { setNodeRef, isOver } = useSortable({ id });
+    const { setNodeRef, isOver } = useDroppable({ id });
     const [quickAdd, setQuickAdd] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const inputRef = useRef(null);
@@ -305,7 +341,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col rounded-2xl bg-secondary/20 border transition-all h-full ${isOver ? 'border-primary/50 bg-primary/5' : 'border-white/10'
+            className={`flex flex-col rounded-2xl bg-secondary/20 border transition-all h-full overflow-hidden ${isOver ? 'border-primary/50 bg-primary/5' : 'border-white/10'
                 }`}
         >
             {/* Header */}
@@ -371,7 +407,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onToggle, onDelete, onUpdate }) {
-    const { setNodeRef, isOver } = useSortable({ id });
+    const { setNodeRef, isOver } = useDroppable({ id });
     const [quickAdd, setQuickAdd] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const inputRef = useRef(null);
@@ -627,8 +663,8 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                 </div>
                 <div className="col-span-1 pt-1.5">
                     <span className={`text-[10px] font-medium uppercase px-2 py-1 rounded-lg ${task.status === 'todo' ? 'bg-muted text-muted-foreground' :
-                            task.status === 'in-progress' ? 'bg-accent/20 text-accent' :
-                                'bg-green-500/20 text-green-500'
+                        task.status === 'in-progress' ? 'bg-accent/20 text-accent' :
+                            'bg-green-500/20 text-green-500'
                         }`}>
                         {task.status.replace('-', ' ')}
                     </span>
@@ -694,11 +730,20 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
         >
             <CardContent className={compact ? 'p-2' : 'p-3'}>
                 <div className="flex items-start gap-2">
+                    {/* Drag Handle */}
+                    <div
+                        {...attributes}
+                        {...listeners}
+                        className="mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing p-0.5 -ml-1 rounded hover:bg-white/10 transition-colors touch-none"
+                        title="Drag to move"
+                    >
+                        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                    </div>
+
                     {/* Checkbox */}
                     {onToggle && (
                         <button
                             className="mt-0.5 flex-shrink-0"
-                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); onToggle(); }}
                         >
                             {task.status === 'done'
@@ -854,6 +899,17 @@ function TaskNotes({ task, onUpdate, isOverlay }) {
                             <SmartInput
                                 value={noteValue}
                                 onChange={(e) => setNoteValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSave();
+                                    }
+                                    if (e.key === 'Escape') {
+                                        setIsEditing(false);
+                                        setNoteValue(task.description || '');
+                                        if (!task.description) setIsExpanded(false);
+                                    }
+                                }}
                                 className="w-full text-xs bg-black/20 border-white/10 rounded-lg min-h-[60px] p-2 align-top"
                                 placeholder="Add notes... (@ to reference files)"
                                 autoFocus
