@@ -43,6 +43,19 @@ def get_model_id(preset: str) -> str:
     # Default to fast if invalid preset
     return MODEL_PRESETS["fast"]["id"]
 
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+# Pydantic models for structured AI response
+class Reference(BaseModel):
+    type: str = Field(description="Either 'File' or 'Task'")
+    name: str = Field(description="The exact name of the file or task title")
+
+class ChatResponse(BaseModel):
+    message: str = Field(description="The AI response text with Markdown formatting")
+    references: List[Reference] = Field(description="List of files or tasks referenced in the response", default=[])
+
+
 async def generate_response(
     history: list,
     message: str,
@@ -56,7 +69,7 @@ async def generate_response(
     Status: {project_context['status']}
     
     CONTEXT:
-    The user has shared the following project context with you. Use it to answer questions accurately.
+    The user has shared the following project context. Use it to answer questions.
     
     FILES:
     {_format_files(project_context.get('files', []))}
@@ -66,9 +79,11 @@ async def generate_response(
     
     INSTRUCTIONS:
     - Be concise, technical, and helpful.
-    - If writing code, use Markdown code blocks.
-    - If the user asks about a specific file, refer to its content.
-    - If web search is enabled, use it to find up-to-date information.
+    - ONLY use code blocks or backticks for actual programming code snippets.
+    - NEVER use backticks for regular words like "todo", "done", status names, or any non-code text.
+    - When mentioning files or tasks, just write their names naturally in plain text.
+    - DO NOT create markdown links. DO NOT use [name](url) syntax.
+    - For each file or task you mention, add it to the references array with the EXACT title.
     """
 
     # Convert history
@@ -86,24 +101,48 @@ async def generate_response(
     model_id = get_model_id(model_preset)
     
     print(f"DEBUG: Using model: {model_id} (preset: {model_preset})")
-    print(f"DEBUG: Tools config: {tools}")
 
     try:
-        # Generate content
+        # Generate content with mandatory JSON schema
         response = await client.aio.models.generate_content(
             model=model_id,
             contents=chat_history + [types.Content(role='user', parts=[types.Part.from_text(text=message)])],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                tools=tools
+                tools=tools if tools else None,
+                response_mime_type="application/json",
+                response_json_schema=ChatResponse.model_json_schema()
             )
         )
         
-        return {
-            "text": response.text,
-            "sources": [],
-            "model_used": model_id
-        }
+        # Parse JSON response using Pydantic for validation
+        import json
+        try:
+            parsed = ChatResponse.model_validate_json(response.text)
+            return {
+                "text": parsed.message,
+                "references": [ref.model_dump() for ref in parsed.references],
+                "sources": [],
+                "model_used": model_id
+            }
+        except Exception as parse_error:
+            print(f"DEBUG: JSON parsing failed: {parse_error}, raw: {response.text[:500]}")
+            # Fallback: try basic JSON parsing
+            try:
+                raw = json.loads(response.text)
+                return {
+                    "text": raw.get("message", response.text),
+                    "references": raw.get("references", []),
+                    "sources": [],
+                    "model_used": model_id
+                }
+            except:
+                return {
+                    "text": response.text,
+                    "references": [],
+                    "sources": [],
+                    "model_used": model_id
+                }
 
     except Exception as e:
         print("DEBUG: Detailed traceback:")
@@ -116,7 +155,8 @@ def _format_files(files):
 
 def _format_tasks(tasks):
     if not tasks: return "No tasks."
-    return "\n".join([f"- [{t['status']}] {t['title']} (Priority: {t['priority']})" for t in tasks])
+    # Format: Title: "exact title" | Status: status | Priority: priority
+    return "\n".join([f'- Title: "{t["title"]}" | Status: {t["status"]} | Priority: {t["priority"]}' for t in tasks])
 
 
 async def edit_selection(

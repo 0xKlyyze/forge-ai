@@ -361,11 +361,12 @@ export function useSendChatMessage(projectId) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ sessionId, message, contextMode, referencedFiles, webSearch, modelPreset }) =>
+        mutationFn: ({ sessionId, message, contextMode, referencedFiles, referencedTasks, webSearch, modelPreset }) =>
             api.post(`/chat-sessions/${sessionId}/messages`, {
                 message,
                 context_mode: contextMode,
                 referenced_files: referencedFiles,
+                referenced_tasks: referencedTasks,
                 web_search: webSearch,
                 model_preset: modelPreset,
             }).then(res => res.data),

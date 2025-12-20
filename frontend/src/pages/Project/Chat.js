@@ -18,8 +18,10 @@ import { formatDistanceToNow } from 'date-fns';
 import { useProjectContext } from '../../context/ProjectContext';
 import {
     useChatSessions, useModels, useChatSession,
-    useCreateChatSession, useDeleteChatSession, useUpdateChatSession, useSendChatMessage
+    useCreateChatSession, useDeleteChatSession, useUpdateChatSession, useSendChatMessage,
+    useProjectTasks,
 } from '../../hooks/useProjectQueries';
+import { SquareCheck, FileText as FileIcon } from 'lucide-react';
 import { ChatSkeleton } from '../../components/skeletons/PageSkeletons';
 
 export default function ProjectChat() {
@@ -30,6 +32,10 @@ export default function ProjectChat() {
     // Get files from context
     const { files: contextFiles, isLoadingFiles } = useProjectContext();
     const files = contextFiles || [];
+
+    // Get tasks
+    const tasksQuery = useProjectTasks(projectId);
+    const tasks = tasksQuery.data || [];
 
     // React Query hooks for sessions and models
     const sessionsQuery = useChatSessions(projectId);
@@ -62,9 +68,9 @@ export default function ProjectChat() {
     const [showModelPicker, setShowModelPicker] = useState(false);
 
     // Reference Logic
-    const [referencedFiles, setReferencedFiles] = useState([]);
-    const [showFilePicker, setShowFilePicker] = useState(false);
-    const [fileSearch, setFileSearch] = useState('');
+    const [referencedItems, setReferencedItems] = useState([]); // Array of { type: 'file' | 'task', id, name/title }
+    const [showMentionPicker, setShowMentionPicker] = useState(false);
+    const [mentionSearch, setMentionSearch] = useState('');
 
     // Delete confirmation
     const [deleteConfirmSession, setDeleteConfirmSession] = useState(null);
@@ -240,15 +246,17 @@ export default function ProjectChat() {
         setInput('');
         setLoading(true);
 
-        const filesForContext = referencedFiles.map(f => f.id);
-        setReferencedFiles([]);
+        const referencedFiles = referencedItems.filter(i => i.type === 'file').map(i => i.id);
+        const referencedTasks = referencedItems.filter(i => i.type === 'task').map(i => i.id);
+        setReferencedItems([]);
 
         try {
             const res = await sendMessageMutation.mutateAsync({
                 sessionId: currentSessionId,
                 message: userMsg.content,
                 contextMode: isFullContext ? 'all' : 'selective',
-                referencedFiles: filesForContext,
+                referencedFiles,
+                referencedTasks,
                 webSearch: isWebSearch,
                 modelPreset
             });
@@ -281,23 +289,24 @@ export default function ProjectChat() {
 
         const lastChar = val.slice(-1);
         if (lastChar === '@') {
-            setShowFilePicker(true);
-            setFileSearch('');
-        } else if (showFilePicker) {
+            setShowMentionPicker(true);
+            setMentionSearch('');
+        } else if (showMentionPicker) {
             const match = val.match(/@([\w\s\.-]*)$/);
             if (match) {
-                setFileSearch(match[1]);
+                setMentionSearch(match[1]);
             } else {
-                setShowFilePicker(false);
+                setShowMentionPicker(false);
             }
         }
     };
 
-    const selectFile = (file) => {
-        const newVal = input.replace(/@[\w\s\.-]*$/, `@${file.name} `);
+    const selectItem = (item) => {
+        const name = item.type === 'file' ? item.name : item.title;
+        const newVal = input.replace(/@[\w\s\.-]*$/, `@${name} `);
         setInput(newVal);
-        setReferencedFiles(prev => [...prev, file]);
-        setShowFilePicker(false);
+        setReferencedItems(prev => [...prev, item]);
+        setShowMentionPicker(false);
         inputRef.current?.focus();
     };
 
@@ -427,7 +436,13 @@ export default function ProjectChat() {
 
                         {/* Messages */}
                         {messages.map((msg, i) => (
-                            <MessageBubble key={i} message={msg} />
+                            <MessageBubble
+                                key={i}
+                                message={msg}
+                                files={files}
+                                tasks={tasks}
+                                projectId={projectId}
+                            />
                         ))}
 
                         {/* Loading Indicator */}
@@ -451,25 +466,41 @@ export default function ProjectChat() {
                 {/* Input Area - positioned relative to the chat section */}
                 <div className="absolute bottom-0 left-0 right-0 p-6 pt-0">
                     <div className="max-w-3xl mx-auto">
-                        {/* File Picker Popover */}
-                        {showFilePicker && (
-                            <div className="absolute bottom-full mb-2 w-72 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                        {/* Reference Picker Popover */}
+                        {showMentionPicker && (
+                            <div className="absolute bottom-full mb-2 w-72 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-64 flex flex-col">
                                 <div className="p-2 border-b border-white/5">
-                                    <p className="text-xs text-muted-foreground px-2">Reference a file</p>
+                                    <p className="text-xs text-muted-foreground px-2">Reference a file or task</p>
                                 </div>
-                                <div className="max-h-48 overflow-y-auto">
-                                    {files.filter(f => f.name.toLowerCase().includes(fileSearch.toLowerCase())).map(f => (
+                                <div className="overflow-y-auto flex-1">
+                                    {/* Files */}
+                                    {files.filter(f => f.name.toLowerCase().includes(mentionSearch.toLowerCase())).map(f => (
                                         <button
-                                            key={f.id}
-                                            className="w-full text-left px-4 py-2.5 hover:bg-primary/10 text-sm flex items-center gap-3 transition-colors"
-                                            onClick={() => selectFile(f)}
+                                            key={`file-${f.id}`}
+                                            className="w-full text-left px-4 py-2 hover:bg-primary/10 text-sm flex items-center gap-3 transition-colors"
+                                            onClick={() => selectItem({ type: 'file', ...f })}
                                         >
-                                            <FileText className="h-4 w-4 text-muted-foreground" />
+                                            <FileIcon className="h-4 w-4 text-blue-400" />
                                             <span className="truncate">{f.name}</span>
+                                            <span className="text-[10px] text-muted-foreground ml-auto">File</span>
                                         </button>
                                     ))}
-                                    {files.length === 0 && (
-                                        <div className="p-4 text-xs text-muted-foreground text-center">No files in project</div>
+
+                                    {/* Tasks */}
+                                    {tasks.filter(t => t.title.toLowerCase().includes(mentionSearch.toLowerCase())).map(t => (
+                                        <button
+                                            key={`task-${t.id}`}
+                                            className="w-full text-left px-4 py-2 hover:bg-primary/10 text-sm flex items-center gap-3 transition-colors"
+                                            onClick={() => selectItem({ type: 'task', ...t })}
+                                        >
+                                            <SquareCheck className="h-4 w-4 text-green-400" />
+                                            <span className="truncate">{t.title}</span>
+                                            <span className="text-[10px] text-muted-foreground ml-auto">Task</span>
+                                        </button>
+                                    ))}
+
+                                    {files.length === 0 && tasks.length === 0 && (
+                                        <div className="p-4 text-xs text-muted-foreground text-center">No items found</div>
                                     )}
                                 </div>
                             </div>
@@ -529,13 +560,14 @@ export default function ProjectChat() {
                                 </div>
                             </div>
 
-                            {/* Referenced Files */}
-                            {referencedFiles.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                    {referencedFiles.map(f => (
-                                        <span key={f.id} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-lg flex items-center gap-1">
-                                            <FileText className="h-3 w-3" />
-                                            {f.name}
+                            {/* Referenced Items */}
+                            {referencedItems.length > 0 && (
+                                <div className="flex items-center gap-2 overflow-x-auto max-w-[200px] no-scrollbar">
+                                    {referencedItems.map((item, idx) => (
+                                        <span key={`${item.type}-${item.id}-${idx}`} className={`text-xs px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
+                                            }`}>
+                                            {item.type === 'task' ? <SquareCheck className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                                            <span className="truncate max-w-[80px]">{item.name || item.title}</span>
                                         </span>
                                     ))}
                                 </div>
@@ -548,7 +580,7 @@ export default function ProjectChat() {
                                 ref={inputRef}
                                 value={input}
                                 onChange={handleInputChange}
-                                placeholder="Ask anything... (@ to reference files)"
+                                placeholder="Ask anything... (@ to reference files/tasks)"
                                 className="h-14 pl-5 pr-14 rounded-b-2xl rounded-t-none border-t-0 border-white/10 bg-secondary/80 backdrop-blur-xl shadow-2xl focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
                             />
                             <Button
@@ -600,7 +632,8 @@ export default function ProjectChat() {
 // MESSAGE BUBBLE COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, files = [], tasks = [], projectId }) {
+    const navigate = useNavigate();
     const [copiedCode, setCopiedCode] = useState(false);
     const [copiedMessage, setCopiedMessage] = useState(false);
     const isUser = message.role === 'user';
@@ -615,6 +648,47 @@ function MessageBubble({ message }) {
         navigator.clipboard.writeText(message.content);
         setCopiedMessage(true);
         setTimeout(() => setCopiedMessage(false), 2000);
+    };
+
+    const handleReferenceClick = (type, name) => {
+        if (type === 'File') {
+            const file = files.find(f => f.name === name);
+            if (file) {
+                navigate(`/project/${projectId}/editor/${file.id}`);
+            } else {
+                toast.error(`File "${name}" not found in this project`);
+            }
+        } else if (type === 'Task') {
+            const task = tasks.find(t => t.title === name);
+            if (task) {
+                navigate(`/project/${projectId}/tasks`);
+                toast.success(`Navigating to task: ${name}`);
+            } else {
+                toast.error(`Task "${name}" not found`);
+            }
+        }
+    };
+
+    // Get references from message (new JSON-based approach)
+    const references = message.references || [];
+
+    // Process content to make referenced items clickable inline
+    const processContentWithReferences = (content) => {
+        if (!content || references.length === 0) return content;
+
+        let processed = content;
+        // Sort references by name length (longest first) to avoid partial replacements
+        const sortedRefs = [...references].sort((a, b) => b.name.length - a.name.length);
+
+        sortedRefs.forEach(ref => {
+            // Escape special regex characters in the name
+            const escapedName = ref.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Use lookahead/lookbehind to match the name without requiring word boundaries
+            // This handles file names like "Project-Overview.md" correctly
+            const regex = new RegExp(`(?<![\\w-])${escapedName}(?![\\w-])`, 'g');
+            processed = processed.replace(regex, `[${ref.name}](forgeref://${ref.type}/${ref.name})`);
+        });
+        return processed;
     };
 
     return (
@@ -647,44 +721,74 @@ function MessageBubble({ message }) {
                     : 'bg-secondary/40 border border-white/5 rounded-tl-md backdrop-blur-md'}
             `}>
                 <ReactMarkdown
+                    urlTransform={(url) => {
+                        // Preserve our custom forgeref:// protocol
+                        if (url.startsWith('forgeref://')) return url;
+                        return url;
+                    }}
                     components={{
+                        // Use pre wrapper for code blocks to avoid p > div nesting
+                        pre: ({ children }) => <>{children}</>,
                         code: ({ node, inline, className, children, ...props }) => {
                             const codeText = String(children).replace(/\n$/, '');
-                            return !inline ? (
-                                <div className="relative group my-3">
-                                    <div className="bg-black/60 rounded-xl border border-white/10 overflow-hidden">
-                                        <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-black/40">
-                                            <span className="text-xs text-muted-foreground font-mono">
-                                                {className?.replace('language-', '') || 'code'}
-                                            </span>
-                                            <button
-                                                onClick={() => copyCodeToClipboard(codeText)}
-                                                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                                            >
-                                                {copiedCode ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                                                {copiedCode ? 'Copied!' : 'Copy'}
-                                            </button>
+                            if (!inline) {
+                                return (
+                                    <div className="relative group my-3">
+                                        <div className="bg-black/60 rounded-xl border border-white/10 overflow-hidden">
+                                            <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-black/40">
+                                                <span className="text-xs text-muted-foreground font-mono">
+                                                    {className?.replace('language-', '') || 'code'}
+                                                </span>
+                                                <button
+                                                    onClick={() => copyCodeToClipboard(codeText)}
+                                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                                                >
+                                                    {copiedCode ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                                    {copiedCode ? 'Copied!' : 'Copy'}
+                                                </button>
+                                            </div>
+                                            <pre className="p-3 overflow-x-auto">
+                                                <code className="text-xs font-mono">{children}</code>
+                                            </pre>
                                         </div>
-                                        <pre className="p-3 overflow-x-auto">
-                                            <code className="text-xs font-mono">{children}</code>
-                                        </pre>
                                     </div>
-                                </div>
-                            ) : (
-                                <code className="bg-black/30 rounded px-1.5 py-0.5 font-mono text-xs" {...props}>{children}</code>
-                            )
+                                );
+                            }
+                            return <code className="bg-black/30 rounded px-1.5 py-0.5 font-mono text-xs" {...props}>{children}</code>;
                         },
-                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                        p: ({ children }) => <div className="mb-3 last:mb-0">{children}</div>,
                         ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
                         ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
                         h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
                         h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
                         h3: ({ children }) => <h3 className="text-sm font-bold mb-2">{children}</h3>,
-                        a: ({ href, children }) => <a href={href} className="text-primary underline hover:no-underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                        a: ({ href, children }) => {
+                            // Handle our special reference links (forgeref://Type/Name)
+                            if (href?.startsWith('forgeref://')) {
+                                const parts = href.replace('forgeref://', '').split('/');
+                                const type = parts[0];
+                                const name = parts.slice(1).join('/');
+                                const isTask = type === 'Task';
+                                return (
+                                    <button
+                                        onClick={() => handleReferenceClick(type, name)}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 mx-1 my-0.5 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]
+                                            ${isTask
+                                                ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-300 hover:from-green-500/30 hover:to-emerald-500/30 border border-green-500/40 ring-1 ring-green-500/10'
+                                                : 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-500/40 ring-1 ring-blue-500/10'}`
+                                        }
+                                    >
+                                        {isTask ? <SquareCheck className="h-3.5 w-3.5" /> : <FileIcon className="h-3.5 w-3.5" />}
+                                        <span>{children}</span>
+                                    </button>
+                                );
+                            }
+                            return <a href={href} className="text-primary underline hover:no-underline" target="_blank" rel="noopener noreferrer">{children}</a>;
+                        },
                         blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/50 pl-3 italic text-muted-foreground mb-3">{children}</blockquote>,
                     }}
                 >
-                    {message.content}
+                    {isUser ? message.content : processContentWithReferences(message.content)}
                 </ReactMarkdown>
             </div>
 

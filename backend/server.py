@@ -352,6 +352,7 @@ async def create_task(task: TaskModel, current_user: dict = Depends(get_current_
         priority=new_task.get("priority", "medium"),
         quadrant=new_task.get("quadrant", "q2"),
         importance=new_task.get("importance", "medium"),
+        difficulty=new_task.get("difficulty", "medium"),
         linked_files=new_task.get("linked_files", []),
         due_date=new_task.get("due_date"),
         created_at=new_task["created_at"]
@@ -368,7 +369,7 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
         raise HTTPException(status_code=404, detail="Project not found")
         
     # Allowed fields to update
-    allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "importance"]
+    allowed_keys = ["title", "description", "status", "priority", "quadrant", "linked_files", "due_date", "importance", "difficulty"]
     update_data = {k: v for k, v in task_update.items() if k in allowed_keys}
     
     await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update_data})
@@ -383,6 +384,7 @@ async def update_task(task_id: str, task_update: dict = Body(...), current_user:
         priority=updated_task.get("priority", "medium"),
         quadrant=updated_task.get("quadrant", "q2"),
         importance=updated_task.get("importance", "medium"),
+        difficulty=updated_task.get("difficulty", "medium"),
         linked_files=updated_task.get("linked_files", []),
         due_date=updated_task.get("due_date"),
         created_at=updated_task["created_at"]
@@ -407,6 +409,7 @@ class ChatRequest(BaseModel):
     project_id: str
     context_mode: str = "selective" # 'all' or 'selective'
     referenced_files: List[str] = [] # List of file IDs
+    referenced_tasks: List[str] = [] # List of task IDs
     web_search: bool = False
 
 @app.post("/api/chat")
@@ -427,12 +430,20 @@ async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_c
         cursor_t = db.tasks.find({"project_id": request.project_id})
         async for t in cursor_t:
             context_tasks.append(t)
-    elif request.referenced_files:
+    elif request.referenced_files or request.referenced_tasks:
         # Fetch specific files
-        object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
-        cursor_f = db.files.find({"_id": {"$in": object_ids}})
-        async for f in cursor_f:
-            context_files.append(f)
+        if request.referenced_files:
+            object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
+            cursor_f = db.files.find({"_id": {"$in": object_ids}})
+            async for f in cursor_f:
+                context_files.append(f)
+        
+        # Fetch specific tasks
+        if request.referenced_tasks:
+            task_ids = [ObjectId(tid) for tid in request.referenced_tasks if ObjectId.is_valid(tid)]
+            cursor_t = db.tasks.find({"_id": {"$in": task_ids}})
+            async for t in cursor_t:
+                context_tasks.append(t)
             
     # Always include basic project info
     project_context = {
@@ -671,6 +682,7 @@ class ChatMessageRequest(BaseModel):
     message: str
     context_mode: str = "selective"
     referenced_files: List[str] = []
+    referenced_tasks: List[str] = []
     web_search: bool = False
     model_preset: str = "fast"  # powerful, fast, or efficient
 
@@ -699,11 +711,18 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
         cursor_t = db.tasks.find({"project_id": session["project_id"]})
         async for t in cursor_t:
             context_tasks.append(t)
-    elif request.referenced_files:
-        object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
-        cursor_f = db.files.find({"_id": {"$in": object_ids}})
-        async for f in cursor_f:
-            context_files.append(f)
+    elif request.referenced_files or request.referenced_tasks:
+        if request.referenced_files:
+            object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
+            cursor_f = db.files.find({"_id": {"$in": object_ids}})
+            async for f in cursor_f:
+                context_files.append(f)
+        
+        if request.referenced_tasks:
+            task_ids = [ObjectId(tid) for tid in request.referenced_tasks if ObjectId.is_valid(tid)]
+            cursor_t = db.tasks.find({"_id": {"$in": task_ids}})
+            async for t in cursor_t:
+                context_tasks.append(t)
     
     project_context = {
         "name": project["name"],
@@ -724,7 +743,7 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
             model_preset=request.model_preset
         )
         
-        ai_msg = {"role": "model", "content": response["text"], "timestamp": datetime.now().isoformat()}
+        ai_msg = {"role": "model", "content": response["text"], "references": response.get("references", []), "timestamp": datetime.now().isoformat()}
         
         # Update session with new messages
         await db.chat_sessions.update_one(

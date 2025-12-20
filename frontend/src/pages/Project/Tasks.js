@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ScrollArea } from '../../components/ui/scroll-area';
-import { Plus, Trash2, CheckCircle2, GripVertical, Target, Calendar, Zap, Archive, ListTodo, LayoutGrid, List } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, GripVertical, Target, Calendar, Zap, Archive, ListTodo, LayoutGrid, List, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     DndContext,
@@ -48,6 +48,7 @@ export default function ProjectTasks() {
         const priority = options.priority || 'medium';
         const importance = options.importance || 'medium';
         const status = options.status || 'todo';
+        const difficulty = options.difficulty || 'medium';
 
         // Auto-calculate quadrant
         let quadrant = 'q2';
@@ -63,6 +64,7 @@ export default function ProjectTasks() {
                 title,
                 priority,
                 importance,
+                difficulty,
                 quadrant: options.quadrant || quadrant,
                 status
             });
@@ -481,8 +483,10 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
 // LIST VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
 
+
 function ListView({ tasks, onToggle, onDelete, onUpdate, onCreateTask }) {
     const [quickAdd, setQuickAdd] = useState('');
+    const [sortBy, setSortBy] = useState('newest'); // newest, priority, importance, difficulty
 
     const handleQuickAdd = (e) => {
         e.preventDefault();
@@ -491,6 +495,39 @@ function ListView({ tasks, onToggle, onDelete, onUpdate, onCreateTask }) {
             setQuickAdd('');
         }
     };
+
+    const getSortedTasks = () => {
+        const sorted = [...tasks];
+        const levels = { high: 3, medium: 2, low: 1 };
+
+        switch (sortBy) {
+            case 'priority':
+                return sorted.sort((a, b) => (levels[b.priority] || 0) - (levels[a.priority] || 0));
+            case 'importance':
+                return sorted.sort((a, b) => (levels[b.importance] || 0) - (levels[a.importance] || 0));
+            case 'difficulty':
+                return sorted.sort((a, b) => (levels[b.difficulty] || 0) - (levels[a.difficulty] || 0));
+            case 'newest':
+            default:
+                // Assuming new tasks are at top (prepended), so index order or created_at?
+                // created_at string comparison is usually fine for ISO strings
+                return sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        }
+    };
+
+    const sortedTasks = getSortedTasks();
+
+    const SortButton = ({ id, label }) => (
+        <button
+            onClick={() => setSortBy(id)}
+            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg transition-all ${sortBy === id
+                ? 'bg-primary/20 text-primary'
+                : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                }`}
+        >
+            {label}
+        </button>
+    );
 
     return (
         <div className="h-full flex flex-col rounded-2xl bg-secondary/20 border border-white/10 overflow-hidden">
@@ -510,20 +547,26 @@ function ListView({ tasks, onToggle, onDelete, onUpdate, onCreateTask }) {
                 </div>
             </form>
 
-            {/* Header - with Priority + Importance columns */}
-            <div className="flex-shrink-0 grid grid-cols-12 px-4 py-3 border-b border-white/5 text-xs font-medium text-muted-foreground uppercase">
-                <div className="col-span-1"></div>
-                <div className="col-span-5">Task</div>
-                <div className="col-span-2">Priority</div>
-                <div className="col-span-2">Importance</div>
-                <div className="col-span-1">Status</div>
-                <div className="col-span-1"></div>
+            {/* Header - with Sort Controls */}
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase">
+                    <span className="ml-1">Tasks</span>
+                    <span className="bg-white/5 px-1.5 py-0.5 rounded text-[10px]">{tasks.length}</span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                    <ArrowUpDown className="h-3 w-3 text-muted-foreground mr-1" />
+                    <SortButton id="newest" label="Newest" />
+                    <SortButton id="priority" label="Priority" />
+                    <SortButton id="importance" label="Importance" />
+                    <SortButton id="difficulty" label="Difficulty" />
+                </div>
             </div>
 
             {/* List */}
             <ScrollArea className="flex-1">
                 <div className="divide-y divide-white/5">
-                    {tasks.map(task => (
+                    {sortedTasks.map(task => (
                         <ListItem
                             key={task.id}
                             task={task}
@@ -568,6 +611,12 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
         onUpdate(task.id, { importance: cycle[task.importance] || 'medium' });
     };
 
+    const cycleDifficulty = (e) => {
+        e?.stopPropagation();
+        const cycle = { low: 'medium', medium: 'high', high: 'low' };
+        onUpdate(task.id, { difficulty: cycle[task.difficulty] || 'medium' });
+    };
+
     return (
         <div className={`hover:bg-white/5 transition-colors group ${task.status === 'done' ? 'opacity-50' : ''}`}>
             <div className="grid grid-cols-12 px-4 py-3 items-start">
@@ -593,6 +642,7 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                             <div className="flex gap-1.5 mt-1.5">
                                 <button onClick={cyclePriority} title="Priority"><PriorityBadge priority={task.priority} label="P" clickable /></button>
                                 <button onClick={cycleImportance} title="Importance"><ImportanceBadge importance={task.importance} clickable /></button>
+                                <button onClick={cycleDifficulty} title="Difficulty"><DifficultyBadge difficulty={task.difficulty} clickable /></button>
                             </div>
                         </div>
                     ) : (
@@ -609,6 +659,7 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                                 <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
                                     <button onClick={cyclePriority} title="Priority" className="inline-flex"><PriorityBadge priority={task.priority} label="P" clickable /></button>
                                     <button onClick={cycleImportance} title="Importance" className="inline-flex"><ImportanceBadge importance={task.importance} clickable /></button>
+                                    <button onClick={cycleDifficulty} title="Difficulty" className="inline-flex"><DifficultyBadge difficulty={task.difficulty} clickable /></button>
                                 </span>
                             </div>
 
@@ -696,6 +747,12 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
         onUpdate?.(task.id, { importance: cycle[task.importance] || 'medium' });
     };
 
+    const cycleDifficulty = (e) => {
+        e.stopPropagation();
+        const cycle = { low: 'medium', medium: 'high', high: 'low' };
+        onUpdate?.(task.id, { difficulty: cycle[task.difficulty] || 'medium' });
+    };
+
     return (
         <Card
             ref={setNodeRef}
@@ -754,6 +811,9 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                                     <button onClick={cycleImportance} onPointerDown={(e) => e.stopPropagation()} title="Importance">
                                         <ImportanceBadge importance={task.importance} clickable />
                                     </button>
+                                    <button onClick={cycleDifficulty} onPointerDown={(e) => e.stopPropagation()} title="Difficulty">
+                                        <DifficultyBadge difficulty={task.difficulty} clickable />
+                                    </button>
                                 </div>
                             </div>
                         ) : (
@@ -783,6 +843,14 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                                         className="inline-flex"
                                     >
                                         <ImportanceBadge importance={task.importance} clickable />
+                                    </button>
+                                    <button
+                                        onClick={cycleDifficulty}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        title="Click to change difficulty"
+                                        className="inline-flex"
+                                    >
+                                        <DifficultyBadge difficulty={task.difficulty} clickable />
                                     </button>
                                 </span>
                             </div>
@@ -945,14 +1013,14 @@ function InlineTaskAdd({ onAdd, placeholder = 'Add a task...', compact = false }
 function PriorityBadge({ priority, label, clickable }) {
     const colors = {
         high: 'bg-red-500/20 text-red-400 border-red-500/30',
-        medium: 'bg-primary/20 text-primary border-primary/30',
-        low: 'bg-muted text-muted-foreground border-white/10'
+        medium: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        low: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     };
 
     const fullLabel = priority.charAt(0).toUpperCase() + priority.slice(1);
 
     return (
-        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md border transition-all ${colors[priority]} ${clickable ? 'cursor-pointer hover:opacity-80 hover:scale-105' : ''}`}>
+        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border transition-all ${colors[priority]} ${clickable ? 'cursor-pointer hover:opacity-80 hover:scale-105' : ''}`}>
             {label ? `${label}:${fullLabel}` : fullLabel}
         </span>
     );
@@ -961,15 +1029,31 @@ function PriorityBadge({ priority, label, clickable }) {
 function ImportanceBadge({ importance, clickable }) {
     const colors = {
         high: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-        medium: 'bg-accent/20 text-accent border-accent/30',
-        low: 'bg-muted text-muted-foreground border-white/10'
+        medium: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        low: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     };
 
     const fullLabel = importance.charAt(0).toUpperCase() + importance.slice(1);
 
     return (
-        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md border transition-all ${colors[importance]} ${clickable ? 'cursor-pointer hover:opacity-80 hover:scale-105' : ''}`}>
+        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border transition-all ${colors[importance]} ${clickable ? 'cursor-pointer hover:opacity-80 hover:scale-105' : ''}`}>
             I:{fullLabel}
+        </span>
+    );
+}
+
+function DifficultyBadge({ difficulty, clickable }) {
+    const colors = {
+        high: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+        medium: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+        low: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+    };
+
+    const fullLabel = (difficulty || 'medium').charAt(0).toUpperCase() + (difficulty || 'medium').slice(1);
+
+    return (
+        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border transition-all ${colors[difficulty || 'medium']} ${clickable ? 'cursor-pointer hover:opacity-80 hover:scale-105' : ''}`}>
+            D:{fullLabel}
         </span>
     );
 }
