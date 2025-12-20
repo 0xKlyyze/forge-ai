@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import api from '../../utils/api';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -23,25 +22,25 @@ import { CSS } from '@dnd-kit/utilities';
 import SmartInput from '../../components/SmartInput';
 import SmartText from '../../components/SmartText';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useProjectContext } from '../../context/ProjectContext';
+import { useCreateTask, useUpdateTask, useDeleteTask } from '../../hooks/useProjectQueries';
+import { TasksSkeleton } from '../../components/skeletons/PageSkeletons';
 
 export default function ProjectTasks() {
     const { projectId } = useParams();
-    const [tasks, setTasks] = useState([]);
+    const { tasks, isLoadingTasks } = useProjectContext();
     const [activeId, setActiveId] = useState(null);
     const [activeView, setActiveView] = useState('kanban');
 
-    useEffect(() => {
-        fetchTasks();
-    }, [projectId]);
+    // Mutation hooks with optimistic updates
+    const createTaskMutation = useCreateTask(projectId);
+    const updateTaskMutation = useUpdateTask(projectId);
+    const deleteTaskMutation = useDeleteTask(projectId);
 
-    const fetchTasks = async () => {
-        try {
-            const res = await api.get(`/projects/${projectId}/tasks`);
-            setTasks(res.data);
-        } catch (error) {
-            toast.error("Failed to load tasks");
-        }
-    };
+    // Show skeleton while loading
+    if (isLoadingTasks) {
+        return <TasksSkeleton />;
+    }
 
     const createTask = async (title, options = {}) => {
         if (!title.trim()) return;
@@ -60,15 +59,13 @@ export default function ProjectTasks() {
         else quadrant = 'q4';
 
         try {
-            const res = await api.post('/tasks', {
-                project_id: projectId,
+            await createTaskMutation.mutateAsync({
                 title,
                 priority,
                 importance,
                 quadrant: options.quadrant || quadrant,
                 status
             });
-            setTasks(prev => [res.data, ...prev]);
             toast.success("Task created");
         } catch (error) {
             toast.error("Failed to create task");
@@ -76,36 +73,18 @@ export default function ProjectTasks() {
     };
 
     const updateTask = async (id, updates) => {
-        // Auto-calculate quadrant when priority or importance changes
-        const task = tasks.find(t => t.id === id);
-        if (task && (updates.priority !== undefined || updates.importance !== undefined)) {
-            const newPriority = updates.priority || task.priority;
-            const newImportance = updates.importance || task.importance;
-            const isUrgent = newPriority === 'high';
-            const isImportant = newImportance === 'high';
-            if (isUrgent && isImportant) updates.quadrant = 'q1';
-            else if (!isUrgent && isImportant) updates.quadrant = 'q2';
-            else if (isUrgent && !isImportant) updates.quadrant = 'q3';
-            else updates.quadrant = 'q4';
-        }
-
-        const oldTasks = [...tasks];
-        setTasks(tasks.map(t => t.id === id ? { ...t, ...updates } : t));
         try {
-            await api.put(`/tasks/${id}`, updates);
+            await updateTaskMutation.mutateAsync({ id, updates });
         } catch (error) {
-            setTasks(oldTasks);
-            toast.error("Update failed");
+            // Error handling done in mutation hook
         }
     };
 
     const deleteTask = async (id) => {
         try {
-            await api.delete(`/tasks/${id}`);
-            setTasks(tasks.filter(t => t.id !== id));
-            toast.success("Task deleted");
+            await deleteTaskMutation.mutateAsync(id);
         } catch (error) {
-            toast.error("Failed to delete");
+            // Error handling done in mutation hook
         }
     };
 

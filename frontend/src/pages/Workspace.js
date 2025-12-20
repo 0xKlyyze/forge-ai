@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import FileBrowser from '../components/FileBrowser';
@@ -8,43 +8,94 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../compone
 import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
+import { useProjectContext } from '../context/ProjectContext';
+import { useCreateFile, useUpdateFile, useDeleteFile } from '../hooks/useProjectQueries';
 
 export default function Workspace() {
   const { projectId, fileId } = useParams();
   const navigate = useNavigate();
+
+  // Get data from context (shared with other project pages)
+  const { project: contextProject, files: contextFiles, isLoading } = useProjectContext();
+
+  // Mutation hooks
+  const createFileMutation = useCreateFile(projectId);
+  const updateFileMutation = useUpdateFile(projectId);
+  const deleteFileMutation = useDeleteFile(projectId);
+
+  // Local state for real-time editing (synced with context on mount)
   const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
   const [project, setProject] = useState(null);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Track if we've synced from context
+  const hasSynced = useRef(false);
+
+  // Key for storing last opened file per project
+  const LAST_FILE_KEY = `forge-ai-last-file-${projectId}`;
+
+  // Sync context data to local state on initial load
   useEffect(() => {
-    fetchData();
-  }, [projectId, fileId]);
+    if (isLoading || hasSynced.current) return;
+    if (contextFiles && contextProject) {
+      setFiles(contextFiles);
+      setProject(contextProject);
+      hasSynced.current = true;
 
-  const fetchData = async () => {
-    try {
-      const [projRes, filesRes] = await Promise.all([
-        api.get(`/projects/${projectId}`),
-        api.get(`/projects/${projectId}/files`)
-      ]);
-      setProject(projRes.data);
-      setFiles(filesRes.data);
+      // Now restore the file session
+      restoreFileSession(contextFiles);
+    }
+  }, [contextFiles, contextProject, isLoading]);
 
-      if (fileId) {
-        const found = filesRes.data.find(f => f.id === fileId);
-        if (found) setActiveFile(found);
+  // Reset sync flag when project changes
+  useEffect(() => {
+    hasSynced.current = false;
+    setActiveFile(null);
+  }, [projectId]);
+
+  // Handle URL fileId changes
+  useEffect(() => {
+    if (fileId && files.length > 0) {
+      const found = files.find(f => f.id === fileId);
+      if (found && found.id !== activeFile?.id) {
+        setActiveFile(found);
+        localStorage.setItem(LAST_FILE_KEY, fileId);
+      }
+    }
+  }, [fileId, files]);
+
+  const restoreFileSession = (filesData) => {
+    // Priority: URL fileId > URL query param > localStorage > nothing
+    if (fileId) {
+      const found = filesData.find(f => f.id === fileId);
+      if (found) {
+        setActiveFile(found);
+        localStorage.setItem(LAST_FILE_KEY, fileId);
+      }
+    } else {
+      // Check for ?file= query param
+      const searchParams = new URLSearchParams(window.location.search);
+      const fileName = searchParams.get('file');
+      if (fileName) {
+        const found = filesData.find(f => f.name === fileName);
+        if (found) {
+          setActiveFile(found);
+          localStorage.setItem(LAST_FILE_KEY, found.id);
+          navigate(`/project/${projectId}/editor/${found.id}`, { replace: true });
+        }
       } else {
-        // Check for ?file= query param
-        const searchParams = new URLSearchParams(window.location.search);
-        const fileName = searchParams.get('file');
-        if (fileName) {
-          const found = filesRes.data.find(f => f.name === fileName);
-          if (found) setActiveFile(found);
+        // Check localStorage for last opened file
+        const lastFileId = localStorage.getItem(LAST_FILE_KEY);
+        if (lastFileId) {
+          const found = filesData.find(f => f.id === lastFileId);
+          if (found) {
+            setActiveFile(found);
+            navigate(`/project/${projectId}/editor/${found.id}`, { replace: true });
+          }
         }
       }
-    } catch (error) {
-      console.error("Failed to load workspace data", error);
     }
   };
 
@@ -57,15 +108,11 @@ export default function Workspace() {
         content = `# ${name.replace(/\.(md|txt)$/, '')}\n\nStart writing here...`;
       }
 
-      const res = await api.post('/files', {
-        project_id: projectId,
-        name,
-        type,
-        category,
-        content
-      });
-      setFiles([...files, res.data]);
-      setActiveFile(res.data);
+      const newFile = await createFileMutation.mutateAsync({ name, type, category, content });
+      setFiles(prev => [...prev, newFile]);
+      setActiveFile(newFile);
+      localStorage.setItem(LAST_FILE_KEY, newFile.id);
+      navigate(`/project/${projectId}/editor/${newFile.id}`);
       toast.success("File created");
     } catch (error) {
       toast.error("Failed to create file");
@@ -75,29 +122,29 @@ export default function Workspace() {
   const handleDeleteFile = async (id) => {
     // Confirmation handled by FileBrowser component
     try {
-      await api.delete(`/files/${id}`);
+      await deleteFileMutation.mutateAsync(id);
       const newFiles = files.filter(f => f.id !== id);
       setFiles(newFiles);
       if (activeFile && activeFile.id === id) {
         setActiveFile(null);
+        localStorage.removeItem(LAST_FILE_KEY);
         navigate(`/project/${projectId}/editor`);
       }
-      toast.success("File deleted");
     } catch (error) {
-      toast.error("Delete failed");
+      // Error handled by mutation
     }
   };
 
   // Update file metadata (category, type, name)
   const handleUpdateFile = async (id, updates) => {
     try {
-      await api.put(`/files/${id}`, updates);
+      await updateFileMutation.mutateAsync({ id, updates });
       setFiles(files.map(f => f.id === id ? { ...f, ...updates } : f));
       if (activeFile?.id === id) {
         setActiveFile(prev => ({ ...prev, ...updates }));
       }
     } catch (error) {
-      toast.error("Update failed");
+      // Error handled by mutation
     }
   };
 
@@ -137,6 +184,8 @@ export default function Workspace() {
 
   const handleFileSelect = (file) => {
     setActiveFile(file);
+    // Save to localStorage for session persistence
+    localStorage.setItem(LAST_FILE_KEY, file.id);
     navigate(`/project/${projectId}/editor/${file.id}`);
   };
 
@@ -151,14 +200,13 @@ export default function Workspace() {
         const reader = new FileReader();
         reader.onload = async (e) => {
           try {
-            const res = await api.post('/files', {
-              project_id: projectId,
+            const newFile = await createFileMutation.mutateAsync({
               name: file.name,
               type: 'asset',
               category: 'Assets',
               content: e.target.result
             });
-            setFiles(prev => [...prev, res.data]);
+            setFiles(prev => [...prev, newFile]);
             toast.success(`Uploaded ${file.name}`);
           } catch (error) {
             toast.error(`Failed to upload ${file.name}`);
@@ -181,14 +229,13 @@ export default function Workspace() {
           }
 
           try {
-            const res = await api.post('/files', {
-              project_id: projectId,
+            const newFile = await createFileMutation.mutateAsync({
               name: file.name,
               type,
               category,
               content: e.target.result
             });
-            setFiles(prev => [...prev, res.data]);
+            setFiles(prev => [...prev, newFile]);
             toast.success(`Added ${file.name}`);
           } catch (error) {
             toast.error(`Failed to add ${file.name}`);
@@ -257,7 +304,10 @@ export default function Workspace() {
 
       {/* Main Workspace */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId={`forge-ai-workspace-layout-${projectId}`}
+        >
 
           {/* File Browser */}
           <ResizablePanel defaultSize={18} minSize={15} maxSize={30} className="border-r border-white/5 bg-black/30">
@@ -295,7 +345,7 @@ export default function Workspace() {
           {/* Preview Panel */}
           <ResizablePanel defaultSize={41} className="border-l border-white/5">
             {activeFile ? (
-              <Preview file={activeFile} />
+              <Preview file={activeFile} projectId={projectId} />
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground font-mono text-sm bg-[#0a0a0a]">
                 Preview offline

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -14,16 +14,19 @@ import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
+import { useProjectContext } from '../../context/ProjectContext';
+import { useUpdateTask, useCreateTask, useCreateFile } from '../../hooks/useProjectQueries';
+import { ProjectHomeSkeleton } from '../../components/skeletons/PageSkeletons';
 
 export default function ProjectHome() {
     const { projectId } = useParams();
     const navigate = useNavigate();
-    const [project, setProject] = useState(null);
-    const [stats, setStats] = useState({ fileCount: 0, taskCount: 0, completedTasks: 0, highPriorityFiles: [], nextTask: null, overviewFileId: null });
-    const [links, setLinks] = useState([]);
-    const [recentActivity, setRecentActivity] = useState([]);
-    const [priorityTasks, setPriorityTasks] = useState([]);
-    const [recentChats, setRecentChats] = useState([]);
+
+    // Use shared context data instead of fetching
+    const { project, tasks, files, dashboard, isLoading } = useProjectContext();
+    const updateTaskMutation = useUpdateTask(projectId);
+    const createTaskMutation = useCreateTask(projectId);
+    const createFileMutation = useCreateFile(projectId);
 
     const [aiMessage, setAiMessage] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
@@ -33,51 +36,37 @@ export default function ProjectHome() {
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newDocName, setNewDocName] = useState('');
 
-    useEffect(() => { loadData(); }, [projectId]);
+    // Derived state from context data
+    const links = project?.links || [];
+    const priorityTasks = dashboard?.priority_tasks || [];
+    const recentChats = dashboard?.recent_chats || [];
 
-    const loadData = async () => {
-        try {
-            const [projRes, filesRes, tasksRes, dashboardRes] = await Promise.all([
-                api.get(`/projects/${projectId}`),
-                api.get(`/projects/${projectId}/files`),
-                api.get(`/projects/${projectId}/tasks`),
-                api.get(`/projects/${projectId}/dashboard`)
-            ]);
+    // Compute stats from tasks and files
+    const { stats, recentActivity } = useMemo(() => {
+        const nextTask = tasks.filter(t => t.status === 'todo').sort((a, b) => {
+            const prioMap = { high: 3, medium: 2, low: 1 };
+            return (prioMap[b.priority] || 2) - (prioMap[a.priority] || 2);
+        })[0];
 
-            setProject(projRes.data);
-            setLinks(projRes.data.links || []);
-            setPriorityTasks(dashboardRes.data.priority_tasks || []);
-            setRecentChats(dashboardRes.data.recent_chats || []);
+        const overviewFile = files.find(f => f.name?.toLowerCase().includes('overview') || f.name?.toLowerCase().includes('readme'));
 
-            const files = filesRes.data;
-            const tasks = tasksRes.data;
+        const activity = [
+            ...files.map(f => ({ type: 'file', item: f, date: f.last_edited })),
+            ...tasks.map(t => ({ type: 'task', item: t, date: t.created_at }))
+        ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-            const nextTask = tasks.filter(t => t.status === 'todo').sort((a, b) => {
-                const prioMap = { high: 3, medium: 2, low: 1 };
-                return (prioMap[b.priority] || 2) - (prioMap[a.priority] || 2);
-            })[0];
-
-            const overviewFile = files.find(f => f.name.toLowerCase().includes('overview') || f.name.toLowerCase().includes('readme'));
-
-            const activity = [
-                ...files.map(f => ({ type: 'file', item: f, date: f.last_edited })),
-                ...tasks.map(t => ({ type: 'task', item: t, date: t.created_at }))
-            ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            setStats({
+        return {
+            stats: {
                 fileCount: files.length,
                 taskCount: tasks.length,
                 completedTasks: tasks.filter(t => t.status === 'done').length,
                 highPriorityFiles: files.filter(f => f.pinned),
                 nextTask,
                 overviewFileId: overviewFile?.id
-            });
-
-            setRecentActivity(activity);
-        } catch (error) {
-            console.error("Failed to load project home data", error);
-        }
-    };
+            },
+            recentActivity: activity
+        };
+    }, [tasks, files]);
 
     const handleAiSend = async (e) => {
         e.preventDefault();
@@ -96,17 +85,16 @@ export default function ProjectHome() {
 
     const handleQuickComplete = async (taskId) => {
         try {
-            await api.put(`/tasks/${taskId}`, { status: 'done' });
+            await updateTaskMutation.mutateAsync({ id: taskId, updates: { status: 'done' } });
             toast.success("✨ Task completed!");
-            loadData();
         } catch (error) { toast.error("Failed"); }
     };
 
     const handleCreateTask = async (e) => {
         e.preventDefault();
         try {
-            await api.post('/tasks', { project_id: projectId, title: newTaskTitle, priority: 'medium', importance: 'medium', status: 'todo', quadrant: 'q2' });
-            toast.success("Task created"); setNewTaskTitle(''); setTaskDialogOpen(false); loadData();
+            await createTaskMutation.mutateAsync({ title: newTaskTitle, priority: 'medium', importance: 'medium', status: 'todo', quadrant: 'q2' });
+            toast.success("Task created"); setNewTaskTitle(''); setTaskDialogOpen(false);
         } catch (error) { toast.error("Failed"); }
     };
 
@@ -114,8 +102,8 @@ export default function ProjectHome() {
         e.preventDefault();
         let name = newDocName; if (!name.endsWith('.md')) name += '.md';
         try {
-            await api.post('/files', { project_id: projectId, name, type: 'doc', category: 'Docs', content: '# New Document' });
-            toast.success("Doc created"); setNewDocName(''); setDocDialogOpen(false); loadData();
+            await createFileMutation.mutateAsync({ name, type: 'doc', category: 'Docs', content: '# New Document' });
+            toast.success("Doc created"); setNewDocName(''); setDocDialogOpen(false);
         } catch (error) { toast.error("Failed"); }
     };
 
@@ -142,8 +130,8 @@ export default function ProjectHome() {
         reader.onload = async (ev) => {
             try {
                 let type = file.type.startsWith('image/') ? 'asset' : 'other';
-                await api.post('/files', { project_id: projectId, name: file.name, type, category: type === 'asset' ? 'Assets' : 'Docs', content: ev.target.result });
-                toast.success("Uploaded!"); loadData();
+                await createFileMutation.mutateAsync({ name: file.name, type, category: type === 'asset' ? 'Assets' : 'Docs', content: ev.target.result });
+                toast.success("Uploaded!");
             } catch (err) { toast.error("Failed"); }
         };
         if (file.type.startsWith('text/') || file.name.match(/\.(md|js|jsx|json)$/)) reader.readAsText(file); else reader.readAsDataURL(file);
@@ -175,14 +163,7 @@ export default function ProjectHome() {
         window.URL.revokeObjectURL(url);
     };
 
-    if (!project) return (
-        <div className="h-full flex items-center justify-center">
-            <div className="text-center space-y-4">
-                <div className="h-12 w-12 mx-auto rounded-2xl bg-primary/50 animate-pulse" />
-                <p className="text-muted-foreground animate-pulse">Loading project...</p>
-            </div>
-        </div>
-    );
+    if (isLoading || !project) return <ProjectHomeSkeleton />;
 
     const completionPercent = stats.taskCount > 0 ? Math.round((stats.completedTasks / stats.taskCount) * 100) : 0;
 

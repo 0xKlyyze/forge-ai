@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/queryClient';
 import { AuthProvider, useAuth } from './authContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -26,54 +29,57 @@ const PrivateRoute = ({ children }) => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Layout>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <AuthProvider>
+          <Layout>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                }
+              />
 
-            <Route
-              path="/project/:projectId/onboarding"
-              element={
-                <PrivateRoute>
-                  <ProjectOnboarding />
-                </PrivateRoute>
-              }
-            />
+              <Route
+                path="/project/:projectId/onboarding"
+                element={
+                  <PrivateRoute>
+                    <ProjectOnboarding />
+                  </PrivateRoute>
+                }
+              />
 
-            <Route
-              path="/project/:projectId"
-              element={
-                <PrivateRoute>
-                  <ProjectLayout />
-                </PrivateRoute>
-              }
-            >
-              <Route index element={<Navigate to="home" replace />} />
-              <Route path="home" element={<ProjectHome />} />
-              <Route path="chat" element={<ProjectChat />} />
-              <Route path="files" element={<ProjectFiles />} />
-              <Route path="editor" element={<Workspace />} />
-              <Route path="editor/:fileId" element={<Workspace />} />
-              <Route path="tasks" element={<ProjectTasks />} />
-              <Route path="settings" element={<ProjectSettings />} /> {/* Added Route */}
-            </Route>
+              <Route
+                path="/project/:projectId"
+                element={
+                  <PrivateRoute>
+                    <ProjectLayout />
+                  </PrivateRoute>
+                }
+              >
+                <Route index element={<Navigate to="home" replace />} />
+                <Route path="home" element={<ProjectHome />} />
+                <Route path="chat" element={<ProjectChat />} />
+                <Route path="files" element={<ProjectFiles />} />
+                <Route path="editor" element={<Workspace />} />
+                <Route path="editor/:fileId" element={<Workspace />} />
+                <Route path="tasks" element={<ProjectTasks />} />
+                <Route path="settings" element={<ProjectSettings />} />
+              </Route>
 
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </Layout>
-      </AuthProvider>
-    </Router>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Layout>
+        </AuthProvider>
+      </Router>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

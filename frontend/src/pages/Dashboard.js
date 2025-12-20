@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import {
@@ -17,6 +16,8 @@ import { Plus, Search, Clock, Activity, Trash2, ArrowRight, Zap, Code, Shield, F
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { useDashboard, useCreateProject, useDeleteProject } from '../hooks/useProjectQueries';
+import { DashboardSkeleton } from '../components/skeletons/PageSkeletons';
 
 function use3DTilt(stiffness = 500, damping = 100, intensity = 7) {
   const x = useMotionValue(0);
@@ -236,24 +237,25 @@ function HeroProject({ project, priorityTasks = [], onDelete }) {
 }
 
 export default function Dashboard() {
-  const [projects, setProjects] = useState([]);
-  const [priorityTasks, setPriorityTasks] = useState([]);
+  // React Query hooks
+  const { data, isLoading } = useDashboard();
+  const createProjectMutation = useCreateProject();
+  const deleteProjectMutation = useDeleteProject();
+
+  const projects = data?.projects || [];
+  const priorityTasks = data?.priority_tasks || [];
+
   const [search, setSearch] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
+  // Keyboard shortcut for New Project
   useEffect(() => {
-    fetchDashboardData();
-
-    // Keyboard shortcut for New Project
     const handleKeyDown = (e) => {
-      // Check if user is typing in an input or textarea to avoid conflict
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-
       if (e.key.toLowerCase() === 'n') {
         e.preventDefault();
         setIsExpanded(true);
@@ -270,49 +272,29 @@ export default function Dashboard() {
     }
   }, [isExpanded]);
 
-  const fetchDashboardData = async () => {
-    try {
-      const res = await api.get('/dashboard');
-      setProjects(res.data.projects);
-      setPriorityTasks(res.data.priority_tasks);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data", error);
-    }
-  };
+  // Show skeleton while loading
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
     if (!newProjectName) return;
-    setIsCreating(true);
     try {
-      const res = await api.post('/projects', { name: newProjectName, user_id: "temp" });
-
-      // Manually add the new project to state with default counts 
-      // (Refresh would give full data, but this is faster UX)
-      const newProject = {
-        ...res.data,
-        file_count: 5, // Default templates
-        task_count: 0,
-        completed_tasks: 0
-      };
-
-      setProjects([newProject, ...projects]);
+      const newProject = await createProjectMutation.mutateAsync({ name: newProjectName, user_id: "temp" });
       setNewProjectName('');
       setIsExpanded(false);
       toast.success("Project initialized");
-      navigate(`/project/${res.data.id}/onboarding`);
+      navigate(`/project/${newProject.id}/onboarding`);
     } catch (error) {
       toast.error("Failed to create project");
-    } finally {
-      setIsCreating(false);
     }
   };
 
   const handleDeleteSubmision = async () => {
     if (!projectToDelete) return;
     try {
-      await api.delete(`/projects/${projectToDelete.id}`);
-      setProjects(projects.filter(p => p.id !== projectToDelete.id));
+      await deleteProjectMutation.mutateAsync(projectToDelete.id);
       toast.success("Project deleted");
     } catch (error) {
       toast.error("Failed to delete project");
@@ -439,11 +421,11 @@ export default function Dashboard() {
                         onChange={(e) => setNewProjectName(e.target.value)}
                         className="h-9 bg-black/50 border-white/10 text-center text-sm"
                         onBlur={() => {
-                          if (!newProjectName && !isCreating) setIsExpanded(false);
+                          if (!newProjectName && !createProjectMutation.isPending) setIsExpanded(false);
                         }}
                       />
-                      <Button size="icon" type="submit" disabled={isCreating} className="h-9 w-9 bg-blue-600 hover:bg-blue-500">
-                        {isCreating ? <Activity className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                      <Button size="icon" type="submit" disabled={createProjectMutation.isPending} className="h-9 w-9 bg-blue-600 hover:bg-blue-500">
+                        {createProjectMutation.isPending ? <Activity className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>

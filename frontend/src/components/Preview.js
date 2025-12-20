@@ -59,17 +59,38 @@ const DEVICE_PRESETS = [
   { id: 'mobile', label: 'Mobile (375px)', width: 375, icon: Smartphone },
 ];
 
-export default function Preview({ file }) {
+export default function Preview({ file, projectId }) {
+  // Storage keys for persistence
+  const ZOOM_KEY = `forge-ai-preview-zoom-${projectId}`;
+  const DEVICE_KEY = `forge-ai-preview-device-${projectId}`;
+
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [zoom, setZoom] = useState(100);
-  const [devicePreset, setDevicePreset] = useState('responsive');
+  const [zoom, setZoom] = useState(() => {
+    const saved = localStorage.getItem(ZOOM_KEY);
+    return saved ? parseInt(saved, 10) : 100;
+  });
+  const [devicePreset, setDevicePreset] = useState(() => {
+    return localStorage.getItem(DEVICE_KEY) || 'responsive';
+  });
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Persist zoom changes
+  const handleZoomChange = (newZoom) => {
+    setZoom(newZoom);
+    localStorage.setItem(ZOOM_KEY, String(newZoom));
+  };
+
+  // Persist device preset changes
+  const handleDeviceChange = (newDevice) => {
+    setDevicePreset(newDevice);
+    localStorage.setItem(DEVICE_KEY, newDevice);
+  };
 
   const dependencies = useMemo(() => extractDependencies(file?.content), [file?.content]);
   const currentDevice = DEVICE_PRESETS.find(d => d.id === devicePreset);
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 25));
+  const handleZoomIn = () => handleZoomChange(Math.min(zoom + 25, 200));
+  const handleZoomOut = () => handleZoomChange(Math.max(zoom - 25, 25));
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
   if (!file) return null;
@@ -82,7 +103,7 @@ export default function Preview({ file }) {
         {DEVICE_PRESETS.map(device => (
           <button
             key={device.id}
-            onClick={() => setDevicePreset(device.id)}
+            onClick={() => handleDeviceChange(device.id)}
             className={`p-1.5 rounded-lg transition-all ${devicePreset === device.id
               ? 'bg-primary/20 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -113,7 +134,7 @@ export default function Preview({ file }) {
         <div className="flex items-center gap-2 min-w-[140px]">
           <Slider
             value={[zoom]}
-            onValueChange={([val]) => setZoom(val)}
+            onValueChange={([val]) => handleZoomChange(val)}
             min={25}
             max={200}
             step={5}
@@ -139,7 +160,7 @@ export default function Preview({ file }) {
         {[50, 100, 150].map(preset => (
           <button
             key={preset}
-            onClick={() => setZoom(preset)}
+            onClick={() => handleZoomChange(preset)}
             className={`px-2 py-1 rounded-md text-xs font-mono transition-all ${zoom === preset
               ? 'bg-primary/20 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-white/5'

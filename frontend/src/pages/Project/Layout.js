@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     Home,
     FileText,
@@ -8,9 +8,9 @@ import {
     Sparkles,
     LogOut
 } from 'lucide-react';
-import { Outlet, useLocation, useNavigate, useParams, NavLink } from 'react-router-dom';
-import api from '../../utils/api';
+import { Outlet, useNavigate, useParams, NavLink } from 'react-router-dom';
 import ColorThief from 'colorthief';
+import { ProjectProvider, useProjectContext } from '../../context/ProjectContext';
 
 const MainNavLink = ({ to, label, icon: Icon }) => (
     <NavLink
@@ -28,19 +28,19 @@ const MainNavLink = ({ to, label, icon: Icon }) => (
 
 export default function ProjectLayout() {
     const { projectId } = useParams();
-    const navigate = useNavigate();
-    const [project, setProject] = useState(null);
-    const containerRef = useRef(null);
 
-    useEffect(() => {
-        const fetchProject = async () => {
-            try {
-                const res = await api.get(`/projects/${projectId}`);
-                setProject(res.data);
-            } catch (e) { console.error(e); }
-        };
-        fetchProject();
-    }, [projectId]);
+    return (
+        <ProjectProvider projectId={projectId}>
+            <ProjectLayoutContent />
+        </ProjectProvider>
+    );
+}
+
+function ProjectLayoutContent() {
+    const { projectId } = useParams();
+    const navigate = useNavigate();
+    const { project } = useProjectContext();
+    const containerRef = useRef(null);
 
     // Apply default gradient on mount
     useEffect(() => {

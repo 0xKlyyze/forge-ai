@@ -15,27 +15,50 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { useProjectContext } from '../../context/ProjectContext';
+import {
+    useChatSessions, useModels, useChatSession,
+    useCreateChatSession, useDeleteChatSession, useUpdateChatSession, useSendChatMessage
+} from '../../hooks/useProjectQueries';
+import { ChatSkeleton } from '../../components/skeletons/PageSkeletons';
 
 export default function ProjectChat() {
     const { projectId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
 
+    // Get files from context
+    const { files: contextFiles, isLoadingFiles } = useProjectContext();
+    const files = contextFiles || [];
+
+    // React Query hooks for sessions and models
+    const sessionsQuery = useChatSessions(projectId);
+    const modelsQuery = useModels();
+    const createSessionMutation = useCreateChatSession(projectId);
+    const deleteSessionMutation = useDeleteChatSession(projectId);
+    const updateSessionMutation = useUpdateChatSession(projectId);
+    const sendMessageMutation = useSendChatMessage(projectId);
+
+    const sessions = sessionsQuery.data || [];
+    const models = modelsQuery.data || {};
+
     // Session state
-    const [sessions, setSessions] = useState([]);
-    const [currentSessionId, setCurrentSessionId] = useState(null);
+    const [currentSessionId, setCurrentSessionId] = useState(() => {
+        // Initialize from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('session') || null;
+    });
     const [messages, setMessages] = useState([]);
     const [showSidebar, setShowSidebar] = useState(true);
+    const [sessionLoading, setSessionLoading] = useState(false);
 
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
-    const [files, setFiles] = useState([]);
 
     // Settings
     const [isFullContext, setIsFullContext] = useState(false);
     const [isWebSearch, setIsWebSearch] = useState(false);
     const [modelPreset, setModelPreset] = useState('fast');
-    const [models, setModels] = useState({});
     const [showModelPicker, setShowModelPicker] = useState(false);
 
     // Reference Logic
@@ -46,23 +69,55 @@ export default function ProjectChat() {
     // Delete confirmation
     const [deleteConfirmSession, setDeleteConfirmSession] = useState(null);
 
+    // Track initialization and mount status
+    const hasInitialized = useRef(false);
+    const isMounted = useRef(true);
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
 
-    // Load sessions on mount
+    // Track mount status to prevent state updates after unmount
     useEffect(() => {
-        fetchSessions();
-        fetchFiles();
-        fetchModels();
-    }, [projectId]);
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
-    // Check URL for session ID
+    // Initialize session ONLY once when sessions first load
+    useEffect(() => {
+        if (sessionsQuery.isLoading || hasInitialized.current) return;
+
+        const sessionId = searchParams.get('session');
+
+        if (sessionId) {
+            // URL has session ID - load it
+            loadSession(sessionId);
+            hasInitialized.current = true;
+        } else if (sessions.length > 0) {
+            // No session in URL, but sessions exist - load first one without triggering URL change yet
+            loadSession(sessions[0].id, true);
+            hasInitialized.current = true;
+        } else if (sessions.length === 0 && !createSessionMutation.isPending) {
+            // No sessions at all - create new one
+            createNewSession();
+            hasInitialized.current = true;
+        }
+    }, [sessionsQuery.isLoading, sessions.length]);
+
+    // Handle URL changes (when user clicks session in sidebar)
     useEffect(() => {
         const sessionId = searchParams.get('session');
-        if (sessionId && sessionId !== currentSessionId) {
+        if (sessionId && sessionId !== currentSessionId && hasInitialized.current) {
             loadSession(sessionId);
         }
     }, [searchParams]);
+
+    // Reset initialization when project changes
+    useEffect(() => {
+        hasInitialized.current = false;
+        setCurrentSessionId(null);
+        setMessages([]);
+    }, [projectId]);
 
     // Auto-scroll on new messages
     useEffect(() => {
@@ -71,35 +126,11 @@ export default function ProjectChat() {
         }
     }, [messages]);
 
-    const fetchSessions = async () => {
-        try {
-            const res = await api.get(`/projects/${projectId}/chat-sessions`);
-            setSessions(res.data);
-
-            const sessionId = searchParams.get('session');
-            if (!sessionId && res.data.length > 0) {
-                loadSession(res.data[0].id);
-            } else if (!sessionId && res.data.length === 0) {
-                createNewSession();
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    };
-
-    const fetchFiles = async () => {
-        try {
-            const res = await api.get(`/projects/${projectId}/files`);
-            setFiles(res.data);
-        } catch (error) { console.error(error); }
-    };
-
-    const fetchModels = async () => {
-        try {
-            const res = await api.get('/models');
-            setModels(res.data);
-        } catch (error) { console.error(error); }
-    };
+    // Only show skeleton on TRUE initial load (no cached data)
+    const showInitialSkeleton = sessionsQuery.isLoading && !sessionsQuery.data && !hasInitialized.current;
+    if (showInitialSkeleton) {
+        return <ChatSkeleton />;
+    }
 
     const getModelIcon = (preset) => {
         switch (preset) {
@@ -119,28 +150,52 @@ export default function ProjectChat() {
         }
     };
 
-    const loadSession = async (sessionId) => {
+    const loadSession = async (sessionId, skipUrlUpdate = false) => {
+        if (!isMounted.current) return;
+
+        setSessionLoading(true);
         try {
             const res = await api.get(`/chat-sessions/${sessionId}`);
+
+            // Only update state if still mounted
+            if (!isMounted.current) return;
+
             setCurrentSessionId(sessionId);
             setMessages(res.data.messages || []);
-            setSearchParams({ session: sessionId });
+
+            // Update URL without triggering navigation - only if still mounted
+            if (!skipUrlUpdate && isMounted.current) {
+                setSearchParams({ session: sessionId }, { replace: true });
+            }
         } catch (error) {
             console.error(error);
-            toast.error("Failed to load chat session");
+            if (isMounted.current) {
+                toast.error("Failed to load chat session");
+            }
+        } finally {
+            if (isMounted.current) {
+                setSessionLoading(false);
+            }
         }
     };
 
     const createNewSession = async () => {
+        if (!isMounted.current) return;
+
         try {
-            const res = await api.post(`/projects/${projectId}/chat-sessions`);
-            setSessions(prev => [res.data, ...prev]);
-            setCurrentSessionId(res.data.id);
-            setMessages(res.data.messages || []);
-            setSearchParams({ session: res.data.id });
+            const newSession = await createSessionMutation.mutateAsync();
+
+            // Only update state if still mounted
+            if (!isMounted.current) return;
+
+            setCurrentSessionId(newSession.id);
+            setMessages(newSession.messages || []);
+            setSearchParams({ session: newSession.id }, { replace: true });
         } catch (error) {
             console.error(error);
-            toast.error("Failed to create chat session");
+            if (isMounted.current) {
+                toast.error("Failed to create chat session");
+            }
         }
     };
 
@@ -149,8 +204,7 @@ export default function ProjectChat() {
         const sessionId = deleteConfirmSession;
 
         try {
-            await api.delete(`/chat-sessions/${sessionId}`);
-            setSessions(prev => prev.filter(s => s.id !== sessionId));
+            await deleteSessionMutation.mutateAsync(sessionId);
 
             if (sessionId === currentSessionId) {
                 const remaining = sessions.filter(s => s.id !== sessionId);
@@ -160,10 +214,8 @@ export default function ProjectChat() {
                     createNewSession();
                 }
             }
-            toast.success("Conversation deleted");
         } catch (error) {
             console.error(error);
-            toast.error("Failed to delete conversation");
         } finally {
             setDeleteConfirmSession(null);
         }
@@ -172,14 +224,7 @@ export default function ProjectChat() {
     const togglePin = async (sessionId, currentPinned, e) => {
         e.stopPropagation();
         try {
-            await api.put(`/chat-sessions/${sessionId}`, { pinned: !currentPinned });
-            setSessions(prev => prev.map(s =>
-                s.id === sessionId ? { ...s, pinned: !currentPinned } : s
-            ).sort((a, b) => {
-                if (a.pinned && !b.pinned) return -1;
-                if (!a.pinned && b.pinned) return 1;
-                return new Date(b.updated_at) - new Date(a.updated_at);
-            }));
+            await updateSessionMutation.mutateAsync({ sessionId, updates: { pinned: !currentPinned } });
             toast.success(currentPinned ? "Unpinned" : "Pinned");
         } catch (error) {
             toast.error("Failed to update");
@@ -199,16 +244,16 @@ export default function ProjectChat() {
         setReferencedFiles([]);
 
         try {
-            const res = await api.post(`/chat-sessions/${currentSessionId}/messages`, {
+            const res = await sendMessageMutation.mutateAsync({
+                sessionId: currentSessionId,
                 message: userMsg.content,
-                context_mode: isFullContext ? 'all' : 'selective',
-                referenced_files: filesForContext,
-                web_search: isWebSearch,
-                model_preset: modelPreset
+                contextMode: isFullContext ? 'all' : 'selective',
+                referencedFiles: filesForContext,
+                webSearch: isWebSearch,
+                modelPreset
             });
 
-            setMessages(prev => [...prev, res.data.ai_message]);
-            fetchSessions();
+            setMessages(prev => [...prev, res.ai_message]);
         } catch (error) {
             toast.error("AI connection failed");
             setMessages(prev => [...prev, { role: 'model', content: "Error: Could not connect to intelligence core." }]);

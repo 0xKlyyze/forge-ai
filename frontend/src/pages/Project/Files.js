@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../utils/api';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -17,12 +16,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { useProjectContext } from '../../context/ProjectContext';
+import { useCreateFile, useUpdateFile, useDeleteFile } from '../../hooks/useProjectQueries';
+import { FilesSkeleton } from '../../components/skeletons/PageSkeletons';
 
 export default function ProjectFiles() {
     const { projectId } = useParams();
     const navigate = useNavigate();
-    const [project, setProject] = useState(null);
-    const [files, setFiles] = useState([]);
+
+    // Use shared context data
+    const { project, files, isLoadingFiles } = useProjectContext();
+
+    // Mutation hooks
+    const createFileMutation = useCreateFile(projectId);
+    const updateFileMutation = useUpdateFile(projectId);
+    const deleteFileMutation = useDeleteFile(projectId);
+
     const [search, setSearch] = useState('');
     const [viewMode, setViewMode] = useState('grid');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -40,22 +49,10 @@ export default function ProjectFiles() {
     const [isDragging, setIsDragging] = useState(false);
     const dragCounter = useRef(0);
 
-    useEffect(() => {
-        fetchFiles();
-    }, [projectId]);
-
-    const fetchFiles = async () => {
-        try {
-            const [projRes, filesRes] = await Promise.all([
-                api.get(`/projects/${projectId}`),
-                api.get(`/projects/${projectId}/files`)
-            ]);
-            setProject(projRes.data);
-            setFiles(filesRes.data);
-        } catch (error) {
-            toast.error("Failed to load project data");
-        }
-    };
+    // Show skeleton while loading
+    if (isLoadingFiles) {
+        return <FilesSkeleton />;
+    }
 
     // Drag and drop handlers
     const handleDragEnter = useCallback((e) => {
@@ -113,14 +110,12 @@ export default function ProjectFiles() {
             }
 
             try {
-                const res = await api.post('/files', {
-                    project_id: projectId,
+                await createFileMutation.mutateAsync({
                     name: file.name,
                     type,
                     category,
                     content: e.target.result
                 });
-                setFiles(prev => [res.data, ...prev]);
                 toast.success(`Uploaded: ${file.name}`);
             } catch (error) {
                 toast.error(`Failed to upload: ${file.name}`);
@@ -134,10 +129,8 @@ export default function ProjectFiles() {
 
     const handleTogglePin = async (file) => {
         try {
-            const updated = { ...file, pinned: !file.pinned };
-            await api.put(`/files/${file.id}`, { pinned: updated.pinned });
-            setFiles(files.map(f => f.id === file.id ? updated : f));
-            toast.success(updated.pinned ? "Pinned" : "Unpinned");
+            await updateFileMutation.mutateAsync({ id: file.id, updates: { pinned: !file.pinned } });
+            toast.success(!file.pinned ? "Pinned" : "Unpinned");
         } catch (error) {
             toast.error("Failed to update pin");
         }
@@ -145,8 +138,7 @@ export default function ProjectFiles() {
 
     const handleUpdateTags = async (file, newTags) => {
         try {
-            await api.put(`/files/${file.id}`, { tags: newTags });
-            setFiles(files.map(f => f.id === file.id ? { ...f, tags: newTags } : f));
+            await updateFileMutation.mutateAsync({ id: file.id, updates: { tags: newTags } });
         } catch (error) {
             toast.error("Failed to update tags");
         }
@@ -155,8 +147,7 @@ export default function ProjectFiles() {
     const handleRename = async (file, newName) => {
         if (!newName.trim() || newName === file.name) return;
         try {
-            await api.put(`/files/${file.id}`, { name: newName });
-            setFiles(files.map(f => f.id === file.id ? { ...f, name: newName } : f));
+            await updateFileMutation.mutateAsync({ id: file.id, updates: { name: newName } });
             toast.success("Renamed");
         } catch (error) {
             toast.error("Rename failed");
@@ -194,8 +185,7 @@ export default function ProjectFiles() {
 
     const submitFile = async (name, type, category, content) => {
         try {
-            const res = await api.post('/files', { project_id: projectId, name, type, category, content });
-            setFiles([res.data, ...files]);
+            await createFileMutation.mutateAsync({ name, type, category, content });
             setNewFileName('');
             setUploadFile(null);
             setIsDialogOpen(false);
@@ -205,10 +195,8 @@ export default function ProjectFiles() {
 
     const handleDelete = async (id) => {
         try {
-            await api.delete(`/files/${id}`);
-            setFiles(files.filter(f => f.id !== id));
-            toast.success("Deleted");
-        } catch (error) { toast.error("Failed"); }
+            await deleteFileMutation.mutateAsync(id);
+        } catch (error) { /* handled by mutation */ }
     };
 
     const handleDownload = (file) => {
