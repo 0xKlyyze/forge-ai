@@ -108,9 +108,12 @@ function ProjectLayoutContent() {
     // Global Keyboard Shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
-            // Ignore if input/textarea is focused or if ANY modifier key is pressed (except maybe shift for capitalization, but let's stick to simple keys)
-            // User requested "without the alt".
-            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            // Ignore if input/textarea is focused, or within Monaco Editor, or contenteditable
+            // Monaco Editor uses synthetic inputs, so we check for its container class
+            const activeEl = document.activeElement;
+            if (['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) return;
+            if (activeEl.isContentEditable) return;
+            if (activeEl.closest('.monaco-editor')) return;
             if (e.metaKey || e.ctrlKey || e.altKey) return; // Avoid conflict with browser shortcuts
 
             switch (e.key.toLowerCase()) {

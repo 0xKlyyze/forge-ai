@@ -35,7 +35,12 @@ export const modelKeys = {
 export function useDashboard() {
     return useQuery({
         queryKey: dashboardKeys.main(),
-        queryFn: () => api.get('/dashboard').then(res => res.data),
+        queryFn: () => api.get('/dashboard')
+            .then(res => res.data)
+            .catch(err => {
+                console.error('[Dashboard Query] Failed:', err.response?.status, err.response?.data);
+                throw err;
+            }),
     });
 }
 
@@ -361,7 +366,7 @@ export function useSendChatMessage(projectId) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ sessionId, message, contextMode, referencedFiles, referencedTasks, webSearch, modelPreset }) =>
+        mutationFn: ({ sessionId, message, contextMode, referencedFiles, referencedTasks, webSearch, modelPreset, agenticMode = true }) =>
             api.post(`/chat-sessions/${sessionId}/messages`, {
                 message,
                 context_mode: contextMode,
@@ -369,9 +374,82 @@ export function useSendChatMessage(projectId) {
                 referenced_tasks: referencedTasks,
                 web_search: webSearch,
                 model_preset: modelPreset,
+                agentic_mode: agenticMode,
             }).then(res => res.data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: projectKeys.chatSessions(projectId) });
+        },
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI TOOL EXECUTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function useExecuteToolCall(projectId) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ toolName, arguments: args }) =>
+            api.post('/ai/execute-tool', {
+                tool_name: toolName,
+                arguments: args,
+                project_id: projectId,
+            }).then(res => res.data),
+        onSuccess: (result) => {
+            // Invalidate relevant queries based on tool type
+            if (result.tool_name === 'create_document' || result.tool_name === 'modify_document') {
+                queryClient.invalidateQueries({ queryKey: projectKeys.files(projectId) });
+            }
+            if (result.tool_name === 'create_tasks' || result.tool_name === 'modify_task') {
+                queryClient.invalidateQueries({ queryKey: projectKeys.tasks(projectId) });
+            }
+        },
+        onError: (error) => {
+            toast.error(`Tool execution failed: ${error.response?.data?.detail || error.message}`);
+        },
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI DOCUMENT EDITING - Multi-step editing with diff preview
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function useEditDocument(projectId) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ toolName, fileId, fileName, instructions }) =>
+            api.post('/ai/edit-document', {
+                tool_name: toolName,
+                file_id: fileId,
+                file_name: fileName,
+                instructions: instructions,
+                project_id: projectId,
+            }).then(res => res.data),
+        onSuccess: () => {
+            // Don't invalidate yet - wait for user to accept changes
+            // Invalidation happens when user accepts the diff
+        },
+        onError: (error) => {
+            toast.error(`Document edit failed: ${error.response?.data?.detail || error.message}`);
+        },
+    });
+}
+
+// Helper to save accepted changes after diff review
+export function useAcceptDocumentChanges(projectId) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ fileId, newContent }) =>
+            api.put(`/files/${fileId}`, { content: newContent }).then(res => res.data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: projectKeys.files(projectId) });
+            toast.success('Changes applied successfully');
+        },
+        onError: (error) => {
+            toast.error(`Failed to save changes: ${error.response?.data?.detail || error.message}`);
         },
     });
 }

@@ -7,7 +7,7 @@ from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileM
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
 from typing import List
-from chat import generate_response, get_available_models, edit_selection, assess_project_potential
+from chat import generate_response, get_available_models, edit_selection, assess_project_potential, format_content_with_lines, apply_insert, apply_replace
 from bson import ObjectId
 import os
 
@@ -34,7 +34,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 @app.get("/")
@@ -685,6 +685,7 @@ class ChatMessageRequest(BaseModel):
     referenced_tasks: List[str] = []
     web_search: bool = False
     model_preset: str = "fast"  # powerful, fast, or efficient
+    agentic_mode: bool = True  # Enable AI tool-calling by default
 
 @app.post("/api/chat-sessions/{session_id}/messages")
 async def add_message_to_session(session_id: str, request: ChatMessageRequest, current_user: dict = Depends(get_current_user)):
@@ -700,11 +701,12 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
     # Add user message
     user_msg = {"role": "user", "content": request.message, "timestamp": datetime.now().isoformat()}
     
-    # Gather context
+    # For agentic mode, always load all files and tasks (with IDs for referencing)
     context_files = []
     context_tasks = []
     
-    if request.context_mode == 'all':
+    if request.agentic_mode or request.context_mode == 'all':
+        # Load all files and tasks for agentic features
         cursor_f = db.files.find({"project_id": session["project_id"]})
         async for f in cursor_f:
             context_files.append(f)
@@ -740,10 +742,18 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
             message=request.message,
             project_context=project_context,
             web_search=request.web_search,
-            model_preset=request.model_preset
+            model_preset=request.model_preset,
+            agentic_mode=request.agentic_mode
         )
         
-        ai_msg = {"role": "model", "content": response["text"], "references": response.get("references", []), "timestamp": datetime.now().isoformat()}
+        # Build AI message with tool calls if present
+        ai_msg = {
+            "role": "model", 
+            "content": response["text"], 
+            "references": response.get("references", []),
+            "tool_calls": response.get("tool_calls", []),
+            "timestamp": datetime.now().isoformat()
+        }
         
         # Update session with new messages
         await db.chat_sessions.update_one(
@@ -801,6 +811,192 @@ async def delete_chat_session(session_id: str, current_user: dict = Depends(get_
     await db.chat_sessions.delete_one({"_id": ObjectId(session_id)})
     return {"detail": "Session deleted"}
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI TOOL EXECUTION - Execute tool calls from agentic AI
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ExecuteToolRequest(BaseModel):
+    tool_name: str
+    arguments: dict
+    project_id: str
+
+@app.post("/api/ai/execute-tool")
+async def execute_ai_tool(request: ExecuteToolRequest, current_user: dict = Depends(get_current_user)):
+    """Execute a tool call from the AI (create/modify documents and tasks)"""
+    
+    # Verify project ownership
+    project = await db.projects.find_one({"_id": ObjectId(request.project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    tool_name = request.tool_name
+    args = request.arguments
+    
+    try:
+        if tool_name == "create_document":
+            # Create a new document
+            new_file = {
+                "project_id": request.project_id,
+                "name": args.get("name", "Untitled.md"),
+                "category": args.get("category", "Docs"),
+                "type": args.get("doc_type", "doc"),
+                "content": args.get("content", ""),
+                "priority": 5,
+                "tags": [],
+                "pinned": False,
+                "created_at": datetime.now(),
+                "last_edited": datetime.now()
+            }
+            
+            result = await db.files.insert_one(new_file)
+            
+            # Update project last_edited
+            await db.projects.update_one(
+                {"_id": ObjectId(request.project_id)},
+                {"$set": {"last_edited": datetime.now()}}
+            )
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "result": {
+                    "file_id": str(result.inserted_id),
+                    "name": new_file["name"],
+                    "category": new_file["category"],
+                    "type": new_file["type"],
+                    "content": new_file["content"]
+                },
+                "message": f"Created document: {new_file['name']}"
+            }
+        
+        elif tool_name == "modify_document":
+            # Modify an existing document
+            file_id = args.get("file_id")
+            if not file_id:
+                raise HTTPException(status_code=400, detail="file_id is required")
+            
+            existing_file = await db.files.find_one({"_id": ObjectId(file_id)})
+            if not existing_file:
+                raise HTTPException(status_code=404, detail="File not found")
+            
+            # Verify file belongs to project
+            if existing_file["project_id"] != request.project_id:
+                raise HTTPException(status_code=403, detail="File does not belong to this project")
+            
+            update_data = {
+                "content": args.get("new_content", existing_file.get("content", "")),
+                "last_edited": datetime.now()
+            }
+            
+            await db.files.update_one({"_id": ObjectId(file_id)}, {"$set": update_data})
+            
+            await db.projects.update_one(
+                {"_id": ObjectId(request.project_id)},
+                {"$set": {"last_edited": datetime.now()}}
+            )
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "result": {
+                    "file_id": file_id,
+                    "name": args.get("file_name", existing_file["name"]),
+                    "content": update_data["content"]
+                },
+                "message": f"Updated document: {args.get('file_name', existing_file['name'])}"
+            }
+        
+        elif tool_name == "create_tasks":
+            # Create multiple tasks
+            tasks_data = args.get("tasks", [])
+            if not tasks_data:
+                raise HTTPException(status_code=400, detail="tasks array is required")
+            
+            created_tasks = []
+            for task_item in tasks_data:
+                new_task = {
+                    "project_id": request.project_id,
+                    "title": task_item.get("title", "Untitled Task"),
+                    "description": task_item.get("description", ""),
+                    "status": "todo",
+                    "priority": task_item.get("priority", "medium"),
+                    "importance": task_item.get("importance", "medium"),
+                    "difficulty": "medium",
+                    "quadrant": "q2",  # Default to important but not urgent
+                    "linked_files": [],
+                    "due_date": None,
+                    "created_at": datetime.now()
+                }
+                
+                # Auto-assign quadrant based on priority/importance
+                if task_item.get("priority") == "high" and task_item.get("importance") == "high":
+                    new_task["quadrant"] = "q1"
+                elif task_item.get("importance") == "high":
+                    new_task["quadrant"] = "q2"
+                elif task_item.get("priority") == "high":
+                    new_task["quadrant"] = "q3"
+                else:
+                    new_task["quadrant"] = "q4"
+                
+                result = await db.tasks.insert_one(new_task)
+                created_tasks.append({
+                    "id": str(result.inserted_id),
+                    "title": new_task["title"],
+                    "priority": new_task["priority"],
+                    "importance": new_task["importance"]
+                })
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "result": {
+                    "tasks": created_tasks,
+                    "count": len(created_tasks)
+                },
+                "message": f"Created {len(created_tasks)} task(s)"
+            }
+        
+        elif tool_name == "modify_task":
+            # Modify an existing task
+            task_id = args.get("task_id")
+            if not task_id:
+                raise HTTPException(status_code=400, detail="task_id is required")
+            
+            existing_task = await db.tasks.find_one({"_id": ObjectId(task_id)})
+            if not existing_task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            
+            # Verify task belongs to project
+            if existing_task["project_id"] != request.project_id:
+                raise HTTPException(status_code=403, detail="Task does not belong to this project")
+            
+            updates = args.get("updates", {})
+            allowed_keys = ["title", "description", "status", "priority", "importance", "difficulty", "quadrant"]
+            update_data = {k: v for k, v in updates.items() if k in allowed_keys}
+            
+            if update_data:
+                await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update_data})
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "result": {
+                    "task_id": task_id,
+                    "title": args.get("task_title", existing_task["title"]),
+                    "updates": update_data
+                },
+                "message": f"Updated task: {args.get('task_title', existing_task['title'])}"
+            }
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Tool execution error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- AI EDIT SELECTION ---
 class EditSelectionRequest(BaseModel):
     selection: str
@@ -823,3 +1019,236 @@ async def ai_edit_selection(request: EditSelectionRequest, current_user: dict = 
         return {"edited_content": edited_content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI DOCUMENT EDITING - Multi-step document editing with diff preview
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from google import genai
+from google.genai import types
+import json
+
+# Initialize genai client for document editing
+genai_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+class EditDocumentRequest(BaseModel):
+    tool_name: str  # 'rewrite_document', 'insert_in_document', 'replace_in_document'
+    file_id: str
+    file_name: str
+    instructions: str
+    project_id: str
+
+@app.post("/api/ai/edit-document")
+async def edit_document(request: EditDocumentRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Multi-step document editing endpoint.
+    Returns both original and modified content for diff preview.
+    """
+    
+    # Verify project ownership
+    project = await db.projects.find_one({
+        "_id": ObjectId(request.project_id), 
+        "user_id": current_user["id"]
+    })
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get the file
+    file = await db.files.find_one({"_id": ObjectId(request.file_id)})
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Verify file belongs to project
+    if file["project_id"] != request.project_id:
+        raise HTTPException(status_code=403, detail="File does not belong to this project")
+    
+    original_content = file.get("content", "")
+    tool_name = request.tool_name
+    
+    try:
+        if tool_name == "rewrite_document":
+            # ═══════════════════════════════════════════════════════════════
+            # REWRITE: Single AI call to completely rewrite the document
+            # ═══════════════════════════════════════════════════════════════
+            
+            prompt = f"""You are rewriting a document based on user instructions.
+
+CURRENT DOCUMENT ({request.file_name}):
+{original_content}
+
+USER INSTRUCTIONS:
+{request.instructions}
+
+Please rewrite the entire document according to the instructions above.
+Return ONLY the new document content, no explanations or markdown code blocks.
+"""
+            
+            response = genai_client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=prompt
+            )
+            
+            modified_content = response.text.strip()
+            edit_summary = f"Document completely rewritten based on: {request.instructions[:100]}..."
+            
+        elif tool_name == "insert_in_document":
+            # ═══════════════════════════════════════════════════════════════
+            # INSERT: Two-step AI call - find location, then generate content
+            # ═══════════════════════════════════════════════════════════════
+            
+            # Step 1: Determine insertion point
+            line_indexed_content = format_content_with_lines(original_content)
+            
+            step1_prompt = f"""Analyze this document and determine where to insert new content.
+
+DOCUMENT WITH LINE NUMBERS:
+{line_indexed_content}
+
+USER REQUEST:
+{request.instructions}
+
+Based on the user's request, determine the best line number to insert new content AFTER.
+Respond with ONLY a JSON object in this exact format:
+{{"insert_after_line": <number>, "reason": "<brief explanation>"}}
+
+Example response: {{"insert_after_line": 15, "reason": "Inserting after the introduction section"}}
+"""
+            
+            step1_response = genai_client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=step1_prompt
+            )
+            
+            # Parse the insertion point
+            try:
+                step1_text = step1_response.text.strip()
+                # Clean up potential markdown code blocks
+                if step1_text.startswith("```"):
+                    step1_text = step1_text.split("\n", 1)[1].rsplit("```", 1)[0]
+                step1_result = json.loads(step1_text)
+                insert_line = step1_result.get("insert_after_line", len(original_content.split('\n')))
+            except:
+                # Default to end if parsing fails
+                insert_line = len(original_content.split('\n'))
+            
+            # Step 2: Generate content to insert
+            step2_prompt = f"""Generate content to insert into a document.
+
+DOCUMENT ({request.file_name}):
+{original_content}
+
+INSERTION POINT: After line {insert_line}
+
+USER REQUEST:
+{request.instructions}
+
+Generate ONLY the new content to be inserted. Do not include the existing document content.
+The content should flow naturally with the existing document.
+Do not include any explanations or markdown code blocks, just the raw content to insert.
+"""
+            
+            step2_response = genai_client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=step2_prompt
+            )
+            
+            insert_content = step2_response.text.strip()
+            modified_content = apply_insert(original_content, insert_line, insert_content)
+            edit_summary = f"Inserted content after line {insert_line}"
+            
+        elif tool_name == "replace_in_document":
+            # ═══════════════════════════════════════════════════════════════
+            # REPLACE: Two-step AI call - find range, then generate replacement
+            # ═══════════════════════════════════════════════════════════════
+            
+            # Step 1: Determine replacement range
+            line_indexed_content = format_content_with_lines(original_content)
+            
+            step1_prompt = f"""Analyze this document and determine which lines should be replaced.
+
+DOCUMENT WITH LINE NUMBERS:
+{line_indexed_content}
+
+USER REQUEST:
+{request.instructions}
+
+Based on the user's request, determine the line range to replace.
+Respond with ONLY a JSON object in this exact format:
+{{"start_line": <number>, "end_line": <number>, "reason": "<brief explanation>"}}
+
+Example response: {{"start_line": 10, "end_line": 25, "reason": "Replacing the introduction section"}}
+"""
+            
+            step1_response = genai_client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=step1_prompt
+            )
+            
+            # Parse the replacement range
+            try:
+                step1_text = step1_response.text.strip()
+                if step1_text.startswith("```"):
+                    step1_text = step1_text.split("\n", 1)[1].rsplit("```", 1)[0]
+                step1_result = json.loads(step1_text)
+                start_line = step1_result.get("start_line", 1)
+                end_line = step1_result.get("end_line", len(original_content.split('\n')))
+            except:
+                # Default to replacing the whole document if parsing fails
+                start_line = 1
+                end_line = len(original_content.split('\n'))
+            
+            # Extract the content being replaced for context
+            lines = original_content.split('\n')
+            content_being_replaced = '\n'.join(lines[max(0,start_line-1):min(len(lines),end_line)])
+            
+            # Step 2: Generate replacement content
+            step2_prompt = f"""Generate replacement content for a specific section of a document.
+
+DOCUMENT ({request.file_name}):
+{original_content}
+
+SECTION TO REPLACE (lines {start_line}-{end_line}):
+{content_being_replaced}
+
+USER REQUEST:
+{request.instructions}
+
+Generate ONLY the replacement content for lines {start_line} to {end_line}.
+The content should fit naturally into the document structure.
+Do not include any explanations or markdown code blocks, just the raw replacement content.
+"""
+            
+            step2_response = genai_client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=step2_prompt
+            )
+            
+            replacement_content = step2_response.text.strip()
+            modified_content = apply_replace(original_content, start_line, end_line, replacement_content)
+            edit_summary = f"Replaced lines {start_line}-{end_line}"
+            
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown edit tool: {tool_name}")
+        
+        return {
+            "success": True,
+            "tool_name": tool_name,
+            "result": {
+                "file_id": request.file_id,
+                "file_name": request.file_name,
+                "original_content": original_content,
+                "modified_content": modified_content,
+                "edit_type": tool_name.replace("_document", "").replace("_in", ""),
+                "edit_summary": edit_summary
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Document edit error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -453,7 +453,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {projects.length === 0 && !isCreating && (
+          {projects.length === 0 && !createProjectMutation.isPending && (
             <div className="hidden md:flex col-span-2 items-center justify-center p-8 border border-white/5 border-dashed rounded-xl bg-white/[0.01]">
               <div className="text-center max-w-sm">
                 <Zap className="h-10 w-10 text-yellow-500/50 mx-auto mb-4" />
