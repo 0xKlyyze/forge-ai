@@ -16,6 +16,8 @@ import ProjectFiles from './pages/Project/Files';
 import ProjectSettings from './pages/Project/Settings'; // Import Settings
 import ProjectChat from './pages/Project/Chat';
 import ProjectOnboarding from './pages/Project/Onboarding';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -42,6 +44,24 @@ function App() {
                 element={
                   <PrivateRoute>
                     <Dashboard />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/settings"
+                element={
+                  <PrivateRoute>
+                    <Settings />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/profile"
+                element={
+                  <PrivateRoute>
+                    <Profile />
                   </PrivateRoute>
                 }
               />

@@ -21,7 +21,7 @@ async def reset_password():
     # ==========================================
     #  EDIT THESE VALUES
     # ==========================================
-    YOUR_EMAIL = "mpitaval07@gmail.com"      # <-- Put your email here
+    YOUR_EMAIL = "mpitaval07@gmail.com"
     NEW_PASSWORD = "caca"  # <-- Put your new password here
     # ==========================================
     

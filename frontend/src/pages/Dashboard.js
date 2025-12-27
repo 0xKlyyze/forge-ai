@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import UserMenu from '../components/UserMenu';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import {
@@ -360,13 +361,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4 w-full md:w-auto">
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground mr-4 border border-white/10 px-3 py-1.5 rounded-lg bg-white/5">
-              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                N
-              </kbd>
-              <span>New Project</span>
-            </div>
-            <div className="relative w-full md:w-[320px] group">
+            <div className="relative w-full md:w-[320px] group mr-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-blue-400 transition-colors" />
               <Input
                 type="search"
@@ -376,6 +371,8 @@ export default function Dashboard() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+
+            <UserMenu />
           </div>
         </motion.div>
 
@@ -388,13 +385,15 @@ export default function Dashboard() {
         >
 
           {/* Hero Section */}
-          {showHero && (
-            <HeroProject
-              project={heroProject}
-              priorityTasks={priorityTasks.filter(t => t.project_id === heroProject.id)}
-              onDelete={setProjectToDelete}
-            />
-          )}
+          {
+            showHero && (
+              <HeroProject
+                project={heroProject}
+                priorityTasks={priorityTasks.filter(t => t.project_id === heroProject.id)}
+                onDelete={setProjectToDelete}
+              />
+            )
+          }
 
           {/* Create New Project Card */}
           <motion.div variants={itemVariants} className="h-full" style={{ perspective: 1000 }}>
@@ -446,22 +445,26 @@ export default function Dashboard() {
           </AnimatePresence>
 
           {/* Empty State (if no search results but projects exist, or totally empty except create card) */}
-          {filteredProjects.length === 0 && projects.length > 0 && (
-            <div className="col-span-full py-12 text-center text-muted-foreground">
-              <Search className="h-12 w-12 mx-auto mb-4 opacity-20" />
-              <p>No projects found matching "{search}"</p>
-            </div>
-          )}
-
-          {projects.length === 0 && !createProjectMutation.isPending && (
-            <div className="hidden md:flex col-span-2 items-center justify-center p-8 border border-white/5 border-dashed rounded-xl bg-white/[0.01]">
-              <div className="text-center max-w-sm">
-                <Zap className="h-10 w-10 text-yellow-500/50 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">Start Building</h3>
-                <p className="text-sm text-muted-foreground">Create your first project to get started with Forge. You'll be able to manage tasks, code, and deployments.</p>
+          {
+            filteredProjects.length === 0 && projects.length > 0 && (
+              <div className="col-span-full py-12 text-center text-muted-foreground">
+                <Search className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                <p>No projects found matching "{search}"</p>
               </div>
-            </div>
-          )}
+            )
+          }
+
+          {
+            projects.length === 0 && !createProjectMutation.isPending && (
+              <div className="hidden md:flex col-span-2 items-center justify-center p-8 border border-white/5 border-dashed rounded-xl bg-white/[0.01]">
+                <div className="text-center max-w-sm">
+                  <Zap className="h-10 w-10 text-yellow-500/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-white mb-2">Start Building</h3>
+                  <p className="text-sm text-muted-foreground">Create your first project to get started with Forge. You'll be able to manage tasks, code, and deployments.</p>
+                </div>
+              </div>
+            )
+          }
 
         </motion.div>
 
