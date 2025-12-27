@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from './utils/api';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 
@@ -20,8 +19,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { access_token, user } = response.data;
+      const { access_token, refresh_token, user } = response.data;
+
+      // Store both tokens
       localStorage.setItem('token', access_token);
+      localStorage.setItem('refreshToken', refresh_token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       return true;
@@ -43,6 +45,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
   };

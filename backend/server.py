@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import db, get_db, close_mongo_connection
 from contextlib import asynccontextmanager
 from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse, TaskModel, TaskResponse, ChatSessionModel, ChatSessionResponse, ChatSessionListResponse
-from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from auth import get_password_hash, verify_password, create_access_token, create_refresh_token, verify_refresh_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
 from typing import List
 from chat import generate_response, get_available_models, edit_selection, assess_project_potential, format_content_with_lines, apply_insert, apply_replace
@@ -70,7 +70,52 @@ async def login(form_data: dict = Body(...)):
     access_token = create_access_token(
         data={"sub": user["email"], "id": str(user["_id"])}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer", "user": {"id": str(user["_id"]), "email": user["email"]}}
+    refresh_token = create_refresh_token(
+        data={"sub": user["email"], "id": str(user["_id"])}
+    )
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": {"id": str(user["_id"]), "email": user["email"]}
+    }
+
+@app.post("/api/auth/refresh")
+async def refresh_token(body: dict = Body(...)):
+    """Refresh access token using a valid refresh token."""
+    refresh_token_str = body.get("refresh_token")
+    
+    if not refresh_token_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required"
+        )
+    
+    # Verify the refresh token
+    user_data = verify_refresh_token(refresh_token_str)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Generate new access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access_token = create_access_token(
+        data={"sub": user_data["email"], "id": user_data["id"]},
+        expires_delta=access_token_expires
+    )
+    
+    # Rotate refresh token (generate a new one for added security)
+    new_refresh_token = create_refresh_token(
+        data={"sub": user_data["email"], "id": user_data["id"]}
+    )
+    
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }
 
 # --- PROJECTS ---
 @app.post("/api/projects", response_model=ProjectResponse)
