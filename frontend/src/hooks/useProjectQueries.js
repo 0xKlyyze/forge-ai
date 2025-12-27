@@ -366,12 +366,13 @@ export function useSendChatMessage(projectId) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ sessionId, message, contextMode, referencedFiles, referencedTasks, webSearch, modelPreset, agenticMode = true }) =>
+        mutationFn: ({ sessionId, message, contextMode, referencedFiles, referencedTasks, attachedImages, webSearch, modelPreset, agenticMode = true }) =>
             api.post(`/chat-sessions/${sessionId}/messages`, {
                 message,
                 context_mode: contextMode,
                 referenced_files: referencedFiles,
                 referenced_tasks: referencedTasks,
+                attached_images: attachedImages || [],
                 web_search: webSearch,
                 model_preset: modelPreset,
                 agentic_mode: agenticMode,

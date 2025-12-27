@@ -683,6 +683,7 @@ class ChatMessageRequest(BaseModel):
     context_mode: str = "selective"
     referenced_files: List[str] = []
     referenced_tasks: List[str] = []
+    attached_images: List[dict] = []  # Images with name, mimeType, and base64 data
     web_search: bool = False
     model_preset: str = "fast"  # powerful, fast, or efficient
     agentic_mode: bool = True  # Enable AI tool-calling by default
@@ -701,30 +702,42 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
     # Add user message
     user_msg = {"role": "user", "content": request.message, "timestamp": datetime.now().isoformat()}
     
-    # For agentic mode, always load all files and tasks (with IDs for referencing)
+    # Load files based on context mode:
+    # - 'all' (All Files toggle ON): Load all project files
+    # - 'selective' (default): Only load explicitly referenced files
     context_files = []
     context_tasks = []
     
-    if request.agentic_mode or request.context_mode == 'all':
-        # Load all files and tasks for agentic features
+    if request.context_mode == 'all':
+        # Load ALL files and tasks when "All Files" toggle is enabled
         cursor_f = db.files.find({"project_id": session["project_id"]})
         async for f in cursor_f:
             context_files.append(f)
         cursor_t = db.tasks.find({"project_id": session["project_id"]})
         async for t in cursor_t:
             context_tasks.append(t)
-    elif request.referenced_files or request.referenced_tasks:
+        print(f"DEBUG: All Files mode - loaded {len(context_files)} files, {len(context_tasks)} tasks")
+    else:
+        # Selective mode: Only load explicitly referenced files/tasks
         if request.referenced_files:
+            print(f"DEBUG: Selective mode - loading {len(request.referenced_files)} referenced files")
             object_ids = [ObjectId(fid) for fid in request.referenced_files if ObjectId.is_valid(fid)]
-            cursor_f = db.files.find({"_id": {"$in": object_ids}})
-            async for f in cursor_f:
-                context_files.append(f)
+            if object_ids:
+                cursor_f = db.files.find({"_id": {"$in": object_ids}})
+                async for f in cursor_f:
+                    context_files.append(f)
+            print(f"DEBUG: Loaded files: {[f['name'] for f in context_files]}")
         
         if request.referenced_tasks:
+            print(f"DEBUG: Selective mode - loading {len(request.referenced_tasks)} referenced tasks")
             task_ids = [ObjectId(tid) for tid in request.referenced_tasks if ObjectId.is_valid(tid)]
-            cursor_t = db.tasks.find({"_id": {"$in": task_ids}})
-            async for t in cursor_t:
-                context_tasks.append(t)
+            if task_ids:
+                cursor_t = db.tasks.find({"_id": {"$in": task_ids}})
+                async for t in cursor_t:
+                    context_tasks.append(t)
+        
+        if not request.referenced_files and not request.referenced_tasks:
+            print(f"DEBUG: No files/tasks referenced")
     
     project_context = {
         "name": project["name"],
@@ -741,6 +754,7 @@ async def add_message_to_session(session_id: str, request: ChatMessageRequest, c
             history=history,
             message=request.message,
             project_context=project_context,
+            attached_images=request.attached_images,
             web_search=request.web_search,
             model_preset=request.model_preset,
             agentic_mode=request.agentic_mode
@@ -810,6 +824,33 @@ async def delete_chat_session(session_id: str, current_user: dict = Depends(get_
     
     await db.chat_sessions.delete_one({"_id": ObjectId(session_id)})
     return {"detail": "Session deleted"}
+
+@app.post("/api/chat-sessions/{session_id}/messages/raw")
+async def add_chat_message(session_id: str, message: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Manually add a raw message to a session (e.g. for tool outputs)"""
+    session = await db.chat_sessions.find_one({"_id": ObjectId(session_id)})
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    project = await db.projects.find_one({"_id": ObjectId(session["project_id"]), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Validate message structure minimally
+    if "role" not in message or "content" not in message:
+         raise HTTPException(status_code=400, detail="Message must have role and content")
+    
+    message["timestamp"] = datetime.now().isoformat()
+    
+    await db.chat_sessions.update_one(
+        {"_id": ObjectId(session_id)},
+        {
+            "$push": {"messages": message},
+            "$set": {"updated_at": datetime.now()}
+        }
+    )
+    
+    return {"success": True, "message": message}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AI TOOL EXECUTION - Execute tool calls from agentic AI

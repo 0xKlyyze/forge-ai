@@ -3,10 +3,10 @@ import MonacoEditor from '@monaco-editor/react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
-import { Sparkles, X, Check, ArrowDown, Loader2 } from 'lucide-react';
+import { Sparkles, X, Check, ArrowDown, Loader2, MessageSquarePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function FileEditor({ file, onChange }) {
+export default function FileEditor({ file, onChange, onAddToChat }) {
   const language = file.name.endsWith('.md') ? 'markdown' :
     file.name.endsWith('.tsx') ? 'typescript' :
       file.name.endsWith('.ts') ? 'typescript' : 'javascript';
@@ -241,6 +241,22 @@ export default function FileEditor({ file, onChange }) {
                 }}
               />
               <div className="flex justify-end gap-2">
+                {onAddToChat && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      console.log('[Editor] Add to Chat clicked', { text: selectedText, range: selectionRange });
+                      onAddToChat({ text: selectedText, range: selectionRange });
+                      closePopup();
+                    }}
+                    className="rounded-lg h-8 border-white/10 hover:bg-white/5"
+                    title="Add selection to chat"
+                  >
+                    <MessageSquarePlus className="h-3 w-3 mr-1" />
+                    Chat
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   onClick={handleAIEdit}

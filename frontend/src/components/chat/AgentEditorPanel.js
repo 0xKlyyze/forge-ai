@@ -3,6 +3,7 @@ import { X, FileText, Check, Loader2, ExternalLink, Sparkles, Maximize2, FileEdi
 import { Button } from '../ui/button';
 import FileEditor from '../Editor';
 import { DiffEditor } from '@monaco-editor/react';
+import { cn } from '../../lib/utils';
 
 /**
  * Error boundary to catch Monaco DiffEditor disposal errors.
@@ -50,12 +51,14 @@ export function AgentEditorPanel({
     originalContent = null, // For diff view - the original content before edits
     isDiffMode = false, // true = show diff view, false = normal editor
     editSummary = '', // Summary of what was changed (for diff mode)
-    onContentChange,
+    onContentChange, // (fileId, content)
     onAcceptChanges, // Accept diff changes
     onRejectChanges, // Reject and close diff
-    onOpenInEditor,
+    onOpenInEditor, // Function to open full editor
     onClose,
     isSaving = false,
+    onAddToChat = null, // Function to add selected text to chat
+    isAccepted = false // Indicates changes were already applied
 }) {
     // Ref to track the DiffEditor instance for proper cleanup
     const diffEditorRef = useRef(null);
@@ -263,6 +266,10 @@ export function AgentEditorPanel({
                     <FileEditor
                         file={file}
                         onChange={handleChange}
+                        onAddToChat={(selection) => {
+                            console.log('[AgentPanel] Passing to Chat:', { file, selection });
+                            onAddToChat && onAddToChat({ file, ...selection });
+                        }}
                     />
                 )}
             </div>
@@ -272,26 +279,35 @@ export function AgentEditorPanel({
                 {isDiffMode ? (
                     <>
                         <span className="text-xs text-yellow-400/70">
-                            Review the AI changes before applying
+                            {isAccepted ? 'Changes have been applied' : 'Review the AI changes before applying'}
                         </span>
                         <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={onRejectChanges}
-                                className="h-7 px-3 rounded-lg text-xs hover:bg-red-500/20 hover:text-red-400"
-                            >
-                                <X className="h-3 w-3 mr-1.5" />
-                                Discard
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={onAcceptChanges}
-                                className="h-7 px-3 rounded-lg text-xs bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
-                            >
-                                <Check className="h-3 w-3 mr-1.5" />
-                                Accept Changes
-                            </Button>
+                            {isAccepted ? (
+                                <div className="flex items-center gap-1 px-3 h-7 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium">
+                                    <Check className="h-3 w-3" />
+                                    Applied
+                                </div>
+                            ) : (
+                                <>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={onRejectChanges}
+                                        className="h-7 px-3 rounded-lg text-xs hover:bg-red-500/20 hover:text-red-400"
+                                    >
+                                        <X className="h-3 w-3 mr-1.5" />
+                                        Discard
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={onAcceptChanges}
+                                        className="h-7 px-3 rounded-lg text-xs bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+                                    >
+                                        <Check className="h-3 w-3 mr-1.5" />
+                                        Accept Changes
+                                    </Button>
+                                </>
+                            )}
                         </div>
                     </>
                 ) : (
@@ -375,7 +391,10 @@ export function EditedDocumentCard({
     isLoading = false,
     loadingStep = '',  // 'analyzing', 'generating', etc.
     onViewDiff,
-    onOpenInEditor
+    onOpenInEditor,
+    isAccepted = false,
+    isStale = false,
+    isPersisted = false
 }) {
     // Loading state - show while AI is processing
     if (isLoading) {
@@ -425,42 +444,65 @@ export function EditedDocumentCard({
 
     return (
         <div className={`mt-3 p-3 rounded-xl bg-gradient-to-r ${getEditTypeStyle()} border backdrop-blur-sm`}>
-            <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
+            <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30 flex-shrink-0">
                     <FileEdit className="h-5 w-5 text-yellow-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate flex items-center gap-2">
-                        {file.name}
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate max-w-[180px]">
+                            {file.name}
+                        </p>
+                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 whitespace-nowrap">
                             {getEditTypeLabel()}
                         </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
+                        {isAccepted && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium whitespace-nowrap">
+                                <Check className="h-3 w-3" />
+                                Applied
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {editSummary || 'Click to review changes'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {onViewDiff && (
+            </div>
+
+            {/* Action buttons - separate row for cleaner layout */}
+            <div className="flex items-center gap-2 mt-2 ml-[52px]">
+                {onViewDiff && (
+                    <div className="relative group">
                         <Button
                             size="sm"
                             onClick={onViewDiff}
-                            className="h-8 px-3 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs border border-yellow-500/30"
+                            className={cn(
+                                "h-7 px-2.5 rounded-lg text-xs border transition-all",
+                                isStale
+                                    ? "bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border-orange-500/30"
+                                    : "bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border-yellow-500/30"
+                            )}
                         >
                             <GitCompare className="h-3 w-3 mr-1" />
-                            View Changes
+                            {isStale ? "Outdated" : "View Changes"}
                         </Button>
-                    )}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={onOpenInEditor}
-                        className="h-8 px-3 rounded-lg hover:bg-white/10 text-xs"
-                    >
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        Open
-                    </Button>
-                </div>
+                        {isStale && (
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-2 bg-black/90 text-white text-[10px] rounded-md border border-white/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                                This file has been modified since this edit was suggested.
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={onOpenInEditor}
+                    className="h-7 px-2.5 rounded-lg hover:bg-white/10 text-xs"
+                >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    Open
+                </Button>
             </div>
         </div>
     );

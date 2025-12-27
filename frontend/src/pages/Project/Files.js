@@ -8,7 +8,7 @@ import {
     FileText, Code, Image as ImageIcon, File,
     MoreVertical, ExternalLink, Search, Plus,
     LayoutGrid, List as ListIcon, Trash2, Eye, Upload, Download,
-    Pin, FolderOpen, X, Check, Tag, Hash
+    Pin, FolderOpen, X, Check, Tag, Hash, Bot
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../../components/ui/dropdown-menu';
@@ -37,6 +37,7 @@ export default function ProjectFiles() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [filterType, setFilterType] = useState('All');
     const [filterTag, setFilterTag] = useState('All');
+    const [showChatFiles, setShowChatFiles] = useState(false); // Hide ai-chat files by default
 
     // Creation State
     const [newFileName, setNewFileName] = useState('');
@@ -238,13 +239,17 @@ export default function ProjectFiles() {
         return new Date(b.last_edited) - new Date(a.last_edited);
     });
 
-    // Get all unique tags from files
-    const allTags = [...new Set(files.flatMap(f => f.tags || []))];
+    // Get all unique tags from files (excluding 'ai-chat' from user visible tags)
+    const allTags = [...new Set(files.flatMap(f => f.tags || []))].filter(t => t !== 'ai-chat');
+
+    // Count of ai-chat files
+    const chatFilesCount = files.filter(f => (f.tags || []).includes('ai-chat')).length;
 
     const filteredFiles = sortedFiles
         .filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
         .filter(f => filterType === 'All' || f.category === filterType)
-        .filter(f => filterTag === 'All' || (f.tags || []).includes(filterTag));
+        .filter(f => filterTag === 'All' || (f.tags || []).includes(filterTag))
+        .filter(f => showChatFiles || !(f.tags || []).includes('ai-chat')); // Hide ai-chat files unless toggle is on
 
     return (
         <div
@@ -333,6 +338,21 @@ export default function ProjectFiles() {
                                     <ListIcon className="h-4 w-4" />
                                 </button>
                             </div>
+
+                            {/* Show Chat Files Toggle */}
+                            {chatFilesCount > 0 && (
+                                <button
+                                    onClick={() => setShowChatFiles(!showChatFiles)}
+                                    className={`h-9 px-3 rounded-xl flex items-center gap-1.5 text-xs font-medium transition-all border ${showChatFiles
+                                            ? 'bg-accent/20 border-accent/40 text-accent'
+                                            : 'bg-secondary/30 border-white/10 text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    title={showChatFiles ? 'Hide AI chat files' : 'Show AI chat files'}
+                                >
+                                    <Bot className="h-3.5 w-3.5" />
+                                    <span>{chatFilesCount} chat</span>
+                                </button>
+                            )}
 
                             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                                 <DialogTrigger asChild>

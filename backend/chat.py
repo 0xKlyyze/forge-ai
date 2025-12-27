@@ -3,6 +3,7 @@ from google.genai import types
 import os
 import logging
 import traceback
+import base64
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -351,6 +352,7 @@ async def generate_agentic_response(
     history: list,
     message: str,
     project_context: dict,
+    attached_images: list = None,
     web_search: bool = False,
     model_preset: str = "fast"
 ):
@@ -374,41 +376,58 @@ async def generate_agentic_response(
     TASKS (with IDs for modification):
     {_format_tasks_with_ids(tasks_with_ids)}
     
-    AGENTIC CAPABILITIES:
-    You can take actions on the user's project using the following tools:
+    ═══════════════════════════════════════════════════════════════════════════════
+    CRITICAL: WHEN TO USE TOOLS vs WHEN TO JUST RESPOND
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    **DEFAULT BEHAVIOR**: Just respond with helpful text. Do NOT use tools unless explicitly asked.
+    
+    ❌ DO NOT USE TOOLS for:
+    - Questions like "is this good?", "what do you think?", "explain this", "review this"
+    - Asking for opinions, feedback, analysis, or explanations
+    - General conversation or clarification questions
+    - Any question that doesn't explicitly request creating or modifying content
+    
+    ✅ ONLY USE TOOLS when the user EXPLICITLY asks you to:
+    - "add X to the document" → insert_in_document
+    - "create a new file/document" → create_document
+    - "rewrite this document" → rewrite_document
+    - "replace/update this section" → replace_in_document
+    - "create tasks for X" → create_tasks
+    - "mark task as done" → modify_task
+    
+    The keyword is EXPLICIT - the user must clearly ask you to CREATE, ADD, MODIFY, or UPDATE something.
+    If there's ANY doubt, just respond with text - don't use a tool.
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    AVAILABLE TOOLS (only when explicitly requested):
     
     DOCUMENT TOOLS:
     - create_document: Create a new document/file in the project
-    - rewrite_document: Completely rewrite an existing document (replaces entire content)
-    - insert_in_document: Add new content at a specific location (keeps existing content)
-    - replace_in_document: Replace a specific section while keeping the rest unchanged
+    - rewrite_document: Completely rewrite an existing document
+    - insert_in_document: Add new content at a specific location
+    - replace_in_document: Replace a specific section
     
     TASK TOOLS:
     - create_tasks: Create one or more tasks
-    - modify_task: Update an existing task (use the task_id from context)
-    
-    WHEN TO USE DOCUMENT EDITING TOOLS:
-    - "rewrite", "redo", "completely change", "major overhaul" → use rewrite_document
-    - "add", "insert", "append", "include a new section" → use insert_in_document  
-    - "replace", "update this part", "change the X section" → use replace_in_document
-    - "create", "write", "draft", "generate new" → use create_document
-    
-    WHEN TO USE TASK TOOLS:
-    - "create tasks", "add todos", "generate action items" → use create_tasks
-    - "update task", "mark as done", "change priority" → use modify_task
+    - modify_task: Update an existing task
     
     INSTRUCTIONS:
     - When using tools, also provide a brief message explaining what you're doing.
-    - Be comprehensive when creating document content - don't be lazy!
-    - For rewrite_document, provide clear instructions on what changes to make.
-    - For insert_in_document, specify WHERE to insert (e.g., "after the introduction").
-    - For replace_in_document, specify WHICH section to replace.
-    - When NOT using tools, respond normally with helpful information.
+    - Be comprehensive when creating document content.
+    - For questions, advice, feedback, or explanations - just respond naturally WITHOUT tools.
     """
 
-    # Convert history
+    # Convert history - skip tool messages (they have dict content for frontend rehydration)
     chat_history = []
     for msg in history:
+        # Skip tool messages - these are persisted for frontend rehydration only
+        if msg.get('role') == 'tool':
+            continue
+        # Skip messages with non-string content (e.g. tool outputs stored as dicts)
+        if not isinstance(msg.get('content'), str):
+            continue
         role = 'user' if msg['role'] == 'user' else 'model'
         chat_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg['content'])]))
 
@@ -421,21 +440,46 @@ async def generate_agentic_response(
     print(f"DEBUG: Using model: {model_id} (preset: {model_preset}) with agentic tools")
 
     try:
+        # Build user message parts (text + optional images)
+        user_parts = [types.Part.from_text(text=message)]
+        
+        # Add images if provided
+        if attached_images:
+            print(f"DEBUG: Processing {len(attached_images)} attached images")
+            for img in attached_images:
+                try:
+                    image_data = base64.b64decode(img['data'])
+                    user_parts.append(types.Part.from_bytes(
+                        data=image_data,
+                        mime_type=img.get('mimeType', 'image/png')
+                    ))
+                    print(f"DEBUG: Added image: {img.get('name', 'unknown')} ({img.get('mimeType', 'image/png')})")
+                except Exception as img_err:
+                    print(f"DEBUG: Failed to process image: {img_err}")
+        
         response = await client.aio.models.generate_content(
             model=model_id,
-            contents=chat_history + [types.Content(role='user', parts=[types.Part.from_text(text=message)])],
+            contents=chat_history + [types.Content(role='user', parts=user_parts)],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 tools=tools
             )
         )
         
+        # Debug: Log the user message
+        print(f"DEBUG: User message: {message[:200]}...")
+        print(f"DEBUG: History length: {len(chat_history)} messages")
+        
         # Process the response - check for function calls
         tool_calls = []
         text_parts = []
         
+        print(f"DEBUG: Response candidates count: {len(response.candidates)}")
+        
         for candidate in response.candidates:
-            for part in candidate.content.parts:
+            print(f"DEBUG: Candidate parts count: {len(candidate.content.parts)}")
+            for i, part in enumerate(candidate.content.parts):
+                print(f"DEBUG: Part {i} type: function_call={hasattr(part, 'function_call') and part.function_call is not None}, text={hasattr(part, 'text') and part.text is not None}")
                 if hasattr(part, 'function_call') and part.function_call:
                     fc = part.function_call
                     tool_calls.append({
@@ -443,11 +487,14 @@ async def generate_agentic_response(
                         "arguments": dict(fc.args) if fc.args else {},
                         "status": "pending"
                     })
-                    print(f"DEBUG: Tool call detected: {fc.name} with args: {fc.args}")
+                    print(f"DEBUG: ⚠️ TOOL CALL DETECTED: {fc.name}")
+                    print(f"DEBUG:    Arguments: {str(fc.args)[:200]}...")
                 elif hasattr(part, 'text') and part.text:
                     text_parts.append(part.text)
+                    print(f"DEBUG: Text part: {part.text[:100]}...")
         
         combined_text = " ".join(text_parts) if text_parts else ""
+        print(f"DEBUG: Final - Tool calls: {len(tool_calls)}, Text length: {len(combined_text)}")
         
         # If there are tool calls but no text, generate a helpful message
         if tool_calls and not combined_text:
@@ -481,6 +528,7 @@ async def generate_response(
     history: list,
     message: str,
     project_context: dict,
+    attached_images: list = None,
     web_search: bool = False,
     model_preset: str = "fast",
     agentic_mode: bool = False
@@ -490,7 +538,7 @@ async def generate_response(
     # Route to agentic mode if enabled
     if agentic_mode:
         return await generate_agentic_response(
-            history, message, project_context, web_search, model_preset
+            history, message, project_context, attached_images, web_search, model_preset
         )
     
     system_instruction = f"""
@@ -516,9 +564,15 @@ async def generate_response(
     - For each file or task you mention, add it to the references array with the EXACT title.
     """
 
-    # Convert history
+    # Convert history - skip tool messages (they have dict content for frontend rehydration)
     chat_history = []
     for msg in history:
+        # Skip tool messages - these are persisted for frontend rehydration only
+        if msg.get('role') == 'tool':
+            continue
+        # Skip messages with non-string content (e.g. tool outputs stored as dicts)
+        if not isinstance(msg.get('content'), str):
+            continue
         role = 'user' if msg['role'] == 'user' else 'model'
         chat_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg['content'])]))
 
@@ -584,13 +638,22 @@ async def generate_response(
 
 
 def _format_files_with_ids(files):
-    """Format files with IDs for agentic mode"""
+    """Format files with IDs and content for agentic mode"""
     if not files: 
         return "No files in project."
     lines = []
     for f in files:
         file_id = str(f.get('_id', f.get('id', 'unknown')))
-        lines.append(f"- ID: {file_id} | Name: {f['name']} | Type: {f['type']} | Category: {f.get('category', 'Docs')}")
+        content = f.get('content', '')
+        # Truncate long content to avoid token limits (3000 chars per file)
+        truncated = content[:3000] + ('...' if len(content) > 3000 else '')
+        lines.append(f"""
+--- FILE: {f['name']} ---
+ID: {file_id}
+Type: {f['type']} | Category: {f.get('category', 'Docs')}
+CONTENT:
+{truncated}
+""")
     return "\n".join(lines)
 
 
