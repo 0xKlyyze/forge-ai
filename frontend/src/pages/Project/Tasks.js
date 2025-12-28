@@ -15,8 +15,44 @@ import {
     useSensor,
     useSensors,
     DragOverlay,
-    useDroppable
+    useDroppable,
+    pointerWithin,
+    rectIntersection
 } from '@dnd-kit/core';
+
+// Custom collision detection that prioritizes container drop zones (columns/quadrants)
+// over individual task cards when dragging
+const customCollisionDetection = (args) => {
+    const { droppableContainers, active, pointerCoordinates } = args;
+
+    if (!pointerCoordinates || !active) {
+        return closestCenter(args);
+    }
+
+    // Define container IDs (kanban columns and matrix quadrants)
+    const containerIds = ['todo', 'in-progress', 'done', 'q1', 'q2', 'q3', 'q4'];
+
+    // Get all containers and filter to only include our main drop zones
+    const containers = droppableContainers.filter(container =>
+        containerIds.includes(container.id)
+    );
+
+    // Check if pointer is within any container
+    for (const container of containers) {
+        if (!container.rect.current) continue;
+
+        const { left, right, top, bottom } = container.rect.current;
+        const { x, y } = pointerCoordinates;
+
+        if (x >= left && x <= right && y >= top && y <= bottom) {
+            // Pointer is within this container, return it as the drop target
+            return [{ id: container.id }];
+        }
+    }
+
+    // Fall back to closest center for other cases
+    return closestCenter(args);
+};
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import SmartInput from '../../components/SmartInput';
@@ -135,7 +171,7 @@ export default function ProjectTasks() {
     const doneCount = tasks.filter(t => t.status === 'done').length;
 
     return (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="h-full flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="flex-shrink-0 p-6 lg:px-8 lg:pt-8 pb-4 border-b border-white/5">
@@ -199,6 +235,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                                 <KanbanColumn
                                     id="in-progress"
@@ -210,6 +247,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                                 <KanbanColumn
                                     id="done"
@@ -221,6 +259,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                             </div>
                         )}
@@ -237,6 +276,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                                 <MatrixQuadrant
                                     id="q2"
@@ -248,6 +288,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                                 <MatrixQuadrant
                                     id="q3"
@@ -259,6 +300,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                                 <MatrixQuadrant
                                     id="q4"
@@ -270,6 +312,7 @@ export default function ProjectTasks() {
                                     onToggle={toggleDone}
                                     onDelete={deleteTask}
                                     onUpdate={updateTask}
+                                    isDragging={!!activeId}
                                 />
                             </div>
                         )}
@@ -298,7 +341,7 @@ export default function ProjectTasks() {
 // KANBAN COLUMN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, onCreateTask, onToggle, onDelete, onUpdate }) {
+function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, onCreateTask, onToggle, onDelete, onUpdate, isDragging }) {
     const { setNodeRef, isOver } = useDroppable({ id });
     const [quickAdd, setQuickAdd] = useState('');
     const [isAdding, setIsAdding] = useState(false);
@@ -319,10 +362,20 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
         green: 'text-green-500 border-green-500/30'
     };
 
+    const dropZoneColors = {
+        primary: 'border-primary bg-primary/10',
+        accent: 'border-accent bg-accent/10',
+        green: 'border-green-500 bg-green-500/10'
+    };
+
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col rounded-2xl bg-secondary/20 border transition-all h-full overflow-hidden ${isOver ? 'border-primary/50 bg-primary/5' : 'border-white/10'
+            className={`flex flex-col rounded-2xl bg-secondary/20 border transition-all duration-200 h-full overflow-hidden ${isOver
+                ? 'border-primary ring-2 ring-primary/30 bg-primary/10 scale-[1.02]'
+                : isDragging
+                    ? 'border-primary/30 border-dashed'
+                    : 'border-white/10'
                 }`}
         >
             {/* Header */}
@@ -362,6 +415,28 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
             {/* Tasks */}
             <ScrollArea className="flex-1 p-3">
                 <div className="space-y-2">
+                    {/* Drop Zone Indicator - appears at TOP when dragging */}
+                    {isDragging ? (
+                        <div
+                            className={`flex items-center justify-center py-6 px-4 rounded-xl border-2 border-dashed transition-all duration-300 ${isOver
+                                ? `${dropZoneColors[accentColor]} scale-105`
+                                : 'border-white/20 bg-white/5'
+                                }`}
+                        >
+                            <div className={`flex items-center gap-2 text-sm font-medium transition-colors duration-200 ${isOver ? colorClasses[accentColor].split(' ')[0] : 'text-muted-foreground'
+                                }`}>
+                                <Plus className={`h-4 w-4 transition-transform duration-200 ${isOver ? 'scale-125' : ''}`} />
+                                <span>{isOver ? 'Drop here' : 'Drop to move here'}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Always visible inline add at TOP - hide when dragging */
+                        <InlineTaskAdd
+                            onAdd={onCreateTask}
+                            placeholder={tasks.length === 0 ? 'Add your first task...' : 'Add another task...'}
+                        />
+                    )}
+
                     {tasks.map(task => (
                         <TaskCard
                             key={task.id}
@@ -371,12 +446,6 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
                             onUpdate={onUpdate}
                         />
                     ))}
-
-                    {/* Always visible inline add */}
-                    <InlineTaskAdd
-                        onAdd={onCreateTask}
-                        placeholder={tasks.length === 0 ? 'Add your first task...' : 'Add another task...'}
-                    />
                 </div>
             </ScrollArea>
         </div>
@@ -387,7 +456,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
 // MATRIX QUADRANT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onToggle, onDelete, onUpdate }) {
+function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onToggle, onDelete, onUpdate, isDragging }) {
     const { setNodeRef, isOver } = useDroppable({ id });
     const [quickAdd, setQuickAdd] = useState('');
     const [isAdding, setIsAdding] = useState(false);
@@ -409,6 +478,27 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
         gray: 'border-white/10 bg-secondary/30'
     };
 
+    const colorStylesActive = {
+        red: 'border-red-500 ring-2 ring-red-500/30 bg-red-500/15',
+        blue: 'border-primary ring-2 ring-primary/30 bg-primary/15',
+        amber: 'border-amber-500 ring-2 ring-amber-500/30 bg-amber-500/15',
+        gray: 'border-white/50 ring-2 ring-white/20 bg-white/10'
+    };
+
+    const colorStylesDragging = {
+        red: 'border-red-500/50 border-dashed',
+        blue: 'border-primary/50 border-dashed',
+        amber: 'border-amber-500/50 border-dashed',
+        gray: 'border-white/30 border-dashed'
+    };
+
+    const dropZoneColors = {
+        red: 'border-red-500 bg-red-500/10 text-red-400',
+        blue: 'border-primary bg-primary/10 text-primary',
+        amber: 'border-amber-500 bg-amber-500/10 text-amber-400',
+        gray: 'border-white/40 bg-white/10 text-white/70'
+    };
+
     const headerColors = {
         red: 'text-red-400',
         blue: 'text-primary',
@@ -419,7 +509,12 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col rounded-2xl border transition-all min-h-[280px] ${colorStyles[color]} ${isOver ? 'ring-2 ring-primary/50' : ''}`}
+            className={`flex flex-col rounded-2xl border transition-all duration-200 min-h-[280px] ${isOver
+                ? `${colorStylesActive[color]} scale-[1.02]`
+                : isDragging
+                    ? colorStylesDragging[color]
+                    : colorStyles[color]
+                }`}
         >
             {/* Header */}
             <div className="flex-shrink-0 p-4 border-b border-white/5">
@@ -456,6 +551,28 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
             {/* Tasks */}
             <ScrollArea className="flex-1 p-3">
                 <div className="space-y-2">
+                    {/* Drop Zone Indicator - appears at TOP when dragging */}
+                    {isDragging ? (
+                        <div
+                            className={`flex items-center justify-center py-4 px-3 rounded-xl border-2 border-dashed transition-all duration-300 ${isOver
+                                ? `${dropZoneColors[color]} scale-105`
+                                : 'border-white/20 bg-white/5 text-muted-foreground'
+                                }`}
+                        >
+                            <div className={`flex items-center gap-2 text-xs font-medium transition-all duration-200`}>
+                                <Plus className={`h-3 w-3 transition-transform duration-200 ${isOver ? 'scale-125' : ''}`} />
+                                <span>{isOver ? 'Drop here' : 'Drop to move'}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Always visible inline add at TOP - hide when dragging */
+                        <InlineTaskAdd
+                            onAdd={onCreateTask}
+                            placeholder="Add task..."
+                            compact
+                        />
+                    )}
+
                     {tasks.map(task => (
                         <TaskCard
                             key={task.id}
@@ -466,13 +583,6 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
                             compact
                         />
                     ))}
-
-                    {/* Always visible inline add */}
-                    <InlineTaskAdd
-                        onAdd={onCreateTask}
-                        placeholder="Add task..."
-                        compact
-                    />
                 </div>
             </ScrollArea>
         </div>
