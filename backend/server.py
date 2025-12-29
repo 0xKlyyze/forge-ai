@@ -1074,6 +1074,42 @@ async def execute_ai_tool(request: ExecuteToolRequest, current_user: dict = Depe
                 "message": f"Updated task: {args.get('task_title', existing_task['title'])}"
             }
         
+        elif tool_name == "create_mockup":
+            # Create a new UI mockup file
+            new_file = {
+                "project_id": request.project_id,
+                "name": args.get("name", "Untitled.jsx"),
+                "category": "Mockups",  # Mockups have their own category
+                "type": "mockup",  # Type is 'mockup' for live preview
+                "content": args.get("content", ""),
+                "priority": 5,
+                "tags": ["ai-generated"],
+                "pinned": False,
+                "created_at": datetime.now(),
+                "last_edited": datetime.now()
+            }
+            
+            result = await db.files.insert_one(new_file)
+            
+            # Update project last_edited
+            await db.projects.update_one(
+                {"_id": ObjectId(request.project_id)},
+                {"$set": {"last_edited": datetime.now()}}
+            )
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "result": {
+                    "file_id": str(result.inserted_id),
+                    "name": new_file["name"],
+                    "category": new_file["category"],
+                    "type": new_file["type"],
+                    "content": new_file["content"]
+                },
+                "message": f"Created UI mockup: {new_file['name']}"
+            }
+        
         else:
             raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
     
@@ -1119,7 +1155,7 @@ import json
 genai_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 class EditDocumentRequest(BaseModel):
-    tool_name: str  # 'rewrite_document', 'insert_in_document', 'replace_in_document'
+    tool_name: str  # 'rewrite_document/mockup', 'insert_in_document/mockup', 'replace_in_document/mockup'
     file_id: str
     file_name: str
     instructions: str
@@ -1152,13 +1188,35 @@ async def edit_document(request: EditDocumentRequest, current_user: dict = Depen
     original_content = file.get("content", "")
     tool_name = request.tool_name
     
+    # Determine if this is a mockup edit (uses JSX-specific prompts)
+    is_mockup = tool_name.endswith("_mockup") or file.get("type") == "mockup"
+    file_type_desc = "React component (JSX/TSX)" if is_mockup else "document"
+    content_type = "JSX/TSX code" if is_mockup else "content"
+    
+    # Normalize tool name (mockup tools use same logic as document tools)
+    base_tool_name = tool_name.replace("_mockup", "_document")
+    
     try:
-        if tool_name == "rewrite_document":
+        if base_tool_name == "rewrite_document":
             # ═══════════════════════════════════════════════════════════════
-            # REWRITE: Single AI call to completely rewrite the document
+            # REWRITE: Single AI call to completely rewrite the document/mockup
             # ═══════════════════════════════════════════════════════════════
             
-            prompt = f"""You are rewriting a document based on user instructions.
+            if is_mockup:
+                prompt = f"""You are redesigning a React UI mockup based on user instructions.
+
+CURRENT MOCKUP ({request.file_name}):
+{original_content}
+
+USER INSTRUCTIONS:
+{request.instructions}
+
+Please completely redesign the React component according to the instructions above.
+Return ONLY the new JSX/TSX code, no explanations or markdown code blocks.
+Ensure the component is complete with all necessary imports and uses Tailwind CSS for styling.
+"""
+            else:
+                prompt = f"""You are rewriting a document based on user instructions.
 
 CURRENT DOCUMENT ({request.file_name}):
 {original_content}
@@ -1176,9 +1234,9 @@ Return ONLY the new document content, no explanations or markdown code blocks.
             )
             
             modified_content = response.text.strip()
-            edit_summary = f"Document completely rewritten based on: {request.instructions[:100]}..."
+            edit_summary = f"{'Mockup' if is_mockup else 'Document'} completely redesigned based on: {request.instructions[:100]}..."
             
-        elif tool_name == "insert_in_document":
+        elif base_tool_name == "insert_in_document":
             # ═══════════════════════════════════════════════════════════════
             # INSERT: Two-step AI call - find location, then generate content
             # ═══════════════════════════════════════════════════════════════
@@ -1186,19 +1244,19 @@ Return ONLY the new document content, no explanations or markdown code blocks.
             # Step 1: Determine insertion point
             line_indexed_content = format_content_with_lines(original_content)
             
-            step1_prompt = f"""Analyze this document and determine where to insert new content.
+            step1_prompt = f"""Analyze this {file_type_desc} and determine where to insert new {content_type}.
 
-DOCUMENT WITH LINE NUMBERS:
+{'MOCKUP' if is_mockup else 'DOCUMENT'} WITH LINE NUMBERS:
 {line_indexed_content}
 
 USER REQUEST:
 {request.instructions}
 
-Based on the user's request, determine the best line number to insert new content AFTER.
+Based on the user's request, determine the best line number to insert new {content_type} AFTER.
 Respond with ONLY a JSON object in this exact format:
 {{"insert_after_line": <number>, "reason": "<brief explanation>"}}
 
-Example response: {{"insert_after_line": 15, "reason": "Inserting after the introduction section"}}
+Example response: {{"insert_after_line": 15, "reason": "Inserting after the header component"}}
 """
             
             step1_response = genai_client.models.generate_content(
@@ -1219,7 +1277,23 @@ Example response: {{"insert_after_line": 15, "reason": "Inserting after the intr
                 insert_line = len(original_content.split('\n'))
             
             # Step 2: Generate content to insert
-            step2_prompt = f"""Generate content to insert into a document.
+            if is_mockup:
+                step2_prompt = f"""Generate JSX/TSX code to insert into a React component mockup.
+
+MOCKUP ({request.file_name}):
+{original_content}
+
+INSERTION POINT: After line {insert_line}
+
+USER REQUEST:
+{request.instructions}
+
+Generate ONLY the new JSX/TSX code to be inserted. Do not include the existing component code.
+The code should be valid React/JSX and flow naturally with the existing component.
+Do not include any explanations or markdown code blocks, just the raw JSX to insert.
+"""
+            else:
+                step2_prompt = f"""Generate content to insert into a document.
 
 DOCUMENT ({request.file_name}):
 {original_content}
@@ -1241,9 +1315,9 @@ Do not include any explanations or markdown code blocks, just the raw content to
             
             insert_content = step2_response.text.strip()
             modified_content = apply_insert(original_content, insert_line, insert_content)
-            edit_summary = f"Inserted content after line {insert_line}"
+            edit_summary = f"Inserted {'JSX elements' if is_mockup else 'content'} after line {insert_line}"
             
-        elif tool_name == "replace_in_document":
+        elif base_tool_name == "replace_in_document":
             # ═══════════════════════════════════════════════════════════════
             # REPLACE: Two-step AI call - find range, then generate replacement
             # ═══════════════════════════════════════════════════════════════
@@ -1251,9 +1325,9 @@ Do not include any explanations or markdown code blocks, just the raw content to
             # Step 1: Determine replacement range
             line_indexed_content = format_content_with_lines(original_content)
             
-            step1_prompt = f"""Analyze this document and determine which lines should be replaced.
+            step1_prompt = f"""Analyze this {file_type_desc} and determine which lines should be replaced.
 
-DOCUMENT WITH LINE NUMBERS:
+{'MOCKUP' if is_mockup else 'DOCUMENT'} WITH LINE NUMBERS:
 {line_indexed_content}
 
 USER REQUEST:
@@ -1263,7 +1337,7 @@ Based on the user's request, determine the line range to replace.
 Respond with ONLY a JSON object in this exact format:
 {{"start_line": <number>, "end_line": <number>, "reason": "<brief explanation>"}}
 
-Example response: {{"start_line": 10, "end_line": 25, "reason": "Replacing the introduction section"}}
+Example response: {{"start_line": 10, "end_line": 25, "reason": "Replacing the {'button component' if is_mockup else 'introduction section'}"}}
 """
             
             step1_response = genai_client.models.generate_content(
@@ -1289,7 +1363,24 @@ Example response: {{"start_line": 10, "end_line": 25, "reason": "Replacing the i
             content_being_replaced = '\n'.join(lines[max(0,start_line-1):min(len(lines),end_line)])
             
             # Step 2: Generate replacement content
-            step2_prompt = f"""Generate replacement content for a specific section of a document.
+            if is_mockup:
+                step2_prompt = f"""Generate replacement JSX/TSX code for a specific section of a React component.
+
+MOCKUP ({request.file_name}):
+{original_content}
+
+SECTION TO REPLACE (lines {start_line}-{end_line}):
+{content_being_replaced}
+
+USER REQUEST:
+{request.instructions}
+
+Generate ONLY the replacement JSX/TSX code for lines {start_line} to {end_line}.
+The code should be valid React/JSX and fit naturally into the component structure.
+Do not include any explanations or markdown code blocks, just the raw replacement code.
+"""
+            else:
+                step2_prompt = f"""Generate replacement content for a specific section of a document.
 
 DOCUMENT ({request.file_name}):
 {original_content}
@@ -1312,7 +1403,7 @@ Do not include any explanations or markdown code blocks, just the raw replacemen
             
             replacement_content = step2_response.text.strip()
             modified_content = apply_replace(original_content, start_line, end_line, replacement_content)
-            edit_summary = f"Replaced lines {start_line}-{end_line}"
+            edit_summary = f"Replaced {'component code on' if is_mockup else ''} lines {start_line}-{end_line}"
             
         else:
             raise HTTPException(status_code=400, detail=f"Unknown edit tool: {tool_name}")
@@ -1325,7 +1416,7 @@ Do not include any explanations or markdown code blocks, just the raw replacemen
                 "file_name": request.file_name,
                 "original_content": original_content,
                 "modified_content": modified_content,
-                "edit_type": tool_name.replace("_document", "").replace("_in", ""),
+                "edit_type": tool_name.replace("_document", "").replace("_mockup", "").replace("_in", ""),
                 "edit_summary": edit_summary
             }
         }

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, Component } from 'react';
-import { X, FileText, Check, Loader2, ExternalLink, Sparkles, Maximize2, FileEdit, GitCompare } from 'lucide-react';
+import { X, FileText, Check, Loader2, ExternalLink, Sparkles, Maximize2, FileEdit, GitCompare, Palette, Eye } from 'lucide-react';
 import { Button } from '../ui/button';
 import FileEditor from '../Editor';
 import { DiffEditor } from '@monaco-editor/react';
@@ -535,6 +535,177 @@ export function CreatedTasksCard({ tasks, onViewTasks }) {
                     className="h-8 px-3 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs"
                 >
                     View Tasks
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+
+/**
+ * CreatedMockupCard - Shows in AI message bubble when a UI mockup is created
+ */
+export function CreatedMockupCard({ file, onOpen, onOpenInEditor }) {
+    if (!file) return null;
+
+    return (
+        <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-violet-500/20 to-purple-600/10 border border-violet-500/30 backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
+                    <Palette className="h-5 w-5 text-violet-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                        Created in Mockups • Click to preview
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onOpen}
+                        className="h-8 px-3 rounded-lg hover:bg-white/10 text-xs"
+                    >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Preview
+                    </Button>
+                    <Button
+                        size="sm"
+                        onClick={onOpenInEditor}
+                        className="h-8 px-3 rounded-lg bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 text-xs"
+                    >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Open
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+/**
+ * EditedMockupCard - Shows in AI message bubble when a UI mockup is edited
+ * Supports loading state while AI is processing
+ */
+export function EditedMockupCard({
+    file,
+    editType = 'edit',  // 'rewrite', 'insert', 'replace'
+    editSummary = '',
+    isLoading = false,
+    loadingStep = '',
+    onViewDiff,
+    onOpenInEditor,
+    isAccepted = false,
+    isStale = false,
+    isPersisted = false
+}) {
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-violet-500/20 to-purple-600/10 border border-violet-500/30 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
+                        <Loader2 className="h-5 w-5 text-violet-400 animate-spin" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate flex items-center gap-2">
+                            {file?.name || 'Processing...'}
+                            <span className="text-xs px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-400 border border-violet-500/30 animate-pulse">
+                                Editing
+                            </span>
+                        </p>
+                        <p className="text-xs text-violet-400/70 flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 bg-violet-400 rounded-full animate-pulse" />
+                            {loadingStep || 'AI is redesigning the mockup...'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!file) return null;
+
+    const getEditTypeStyle = () => {
+        switch (editType) {
+            case 'rewrite': return 'from-orange-500/20 to-red-600/10 border-orange-500/30';
+            case 'insert': return 'from-green-500/20 to-emerald-600/10 border-green-500/30';
+            case 'replace': return 'from-yellow-500/20 to-amber-600/10 border-yellow-500/30';
+            default: return 'from-violet-500/20 to-purple-600/10 border-violet-500/30';
+        }
+    };
+
+    const getEditTypeLabel = () => {
+        switch (editType) {
+            case 'rewrite': return 'Redesigned';
+            case 'insert': return 'Elements Added';
+            case 'replace': return 'Components Updated';
+            default: return 'Edited';
+        }
+    };
+
+    return (
+        <div className={`mt-3 p-3 rounded-xl bg-gradient-to-r ${getEditTypeStyle()} border backdrop-blur-sm`}>
+            <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center border border-violet-500/30 flex-shrink-0">
+                    <Palette className="h-5 w-5 text-violet-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate max-w-[180px]">
+                            {file.name}
+                        </p>
+                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-400 border border-violet-500/30 whitespace-nowrap">
+                            {getEditTypeLabel()}
+                        </span>
+                        {isAccepted && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium whitespace-nowrap">
+                                <Check className="h-3 w-3" />
+                                Applied
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {editSummary || 'Click to preview changes'}
+                    </p>
+                </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 mt-2 ml-[52px]">
+                {onViewDiff && (
+                    <div className="relative group">
+                        <Button
+                            size="sm"
+                            onClick={onViewDiff}
+                            className={cn(
+                                "h-7 px-2.5 rounded-lg text-xs border transition-all",
+                                isStale
+                                    ? "bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border-orange-500/30"
+                                    : "bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 border-violet-500/30"
+                            )}
+                        >
+                            <Eye className="h-3 w-3 mr-1" />
+                            {isStale ? "Outdated" : "Preview Changes"}
+                        </Button>
+                        {isStale && (
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-2 bg-black/90 text-white text-[10px] rounded-md border border-white/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                                This mockup has been modified since this edit was suggested.
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={onOpenInEditor}
+                    className="h-7 px-2.5 rounded-lg hover:bg-white/10 text-xs"
+                >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    Open
                 </Button>
             </div>
         </div>

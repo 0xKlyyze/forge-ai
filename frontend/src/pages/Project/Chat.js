@@ -25,7 +25,8 @@ import {
 } from '../../hooks/useProjectQueries';
 import { SquareCheck, FileText as FileIcon } from 'lucide-react';
 import { ChatSkeleton } from '../../components/skeletons/PageSkeletons';
-import { AgentEditorPanel, CreatedDocumentCard, CreatedTasksCard, EditedDocumentCard } from '../../components/chat/AgentEditorPanel';
+import { AgentEditorPanel, CreatedDocumentCard, CreatedTasksCard, EditedDocumentCard, CreatedMockupCard, EditedMockupCard } from '../../components/chat/AgentEditorPanel';
+import { MockupPreviewPanel } from '../../components/chat/MockupPreviewPanel';
 
 
 
@@ -300,6 +301,20 @@ export default function ProjectChat() {
     const [editSummary, setEditSummary] = useState('');
     const [isDiffAccepted, setIsDiffAccepted] = useState(false); // Track if viewing an already-accepted diff
 
+    // Mockup state - For mockup preview panel
+    const [createdMockupsMap, setCreatedMockupsMap] = useState({}); // Map<messageIndex, mockupInfo>
+    const [editedMockupsMap, setEditedMockupsMap] = useState({}); // Map<messageIndex, { file, originalContent, editType, editSummary }>
+    const [mockupPanelFile, setMockupPanelFile] = useState(null); // Currently viewing mockup
+    const [mockupPanelOpen, setMockupPanelOpen] = useState(false);
+    const [isMockupDiffMode, setIsMockupDiffMode] = useState(false);
+    const [mockupOriginalContent, setMockupOriginalContent] = useState('');
+    const [mockupEditSummary, setMockupEditSummary] = useState('');
+    const [isMockupDiffAccepted, setIsMockupDiffAccepted] = useState(false);
+    const [mockupPanelWidth, setMockupPanelWidth] = useState(500); // Resizable panel width
+    const isResizingMockupPanel = useRef(false);
+    const resizeStartX = useRef(0);
+    const resizeStartWidth = useRef(500);
+
 
     // Track initialization and mount status
     const hasInitialized = useRef(false);
@@ -369,6 +384,8 @@ export default function ProjectChat() {
 
         const newCreatedMap = {};
         const newEditedMap = {};
+        const newCreatedMockupsMap = {};
+        const newEditedMockupsMap = {};
         let hasNewData = false;
 
         messages.forEach((msg, index) => {
@@ -436,6 +453,63 @@ export default function ProjectChat() {
                             hasNewData = true;
                         }
                     }
+
+                    // Rehydrate Created Mockups
+                    if (tool.tool_name === 'create_mockup') {
+                        if (!createdMockupsMap[index]) {
+                            const content = toolResult?.result?.content || tool.arguments.content;
+                            newCreatedMockupsMap[index] = {
+                                id: toolResult?.result?.file_id || 'history',
+                                name: tool.arguments.name,
+                                category: 'Mockups',
+                                type: 'mockup',
+                                content: content
+                            };
+                            hasNewData = true;
+                        }
+                    }
+
+                    // Rehydrate Edited Mockups
+                    const mockupEditTools = ['rewrite_mockup', 'insert_in_mockup', 'replace_in_mockup'];
+                    if (mockupEditTools.includes(tool.tool_name)) {
+                        if (!editedMockupsMap[index]) {
+                            let type = 'edit';
+                            if (tool.tool_name === 'rewrite_mockup') type = 'rewrite';
+                            if (tool.tool_name === 'insert_in_mockup') type = 'insert';
+                            if (tool.tool_name === 'replace_in_mockup') type = 'replace';
+
+                            if (toolResult && toolResult.success && toolResult.result) {
+                                const resultData = toolResult.result;
+                                newEditedMockupsMap[index] = {
+                                    file: {
+                                        name: resultData.file_name,
+                                        id: resultData.file_id,
+                                        type: 'mockup'
+                                    },
+                                    originalContent: resultData.original_content,
+                                    modifiedContent: resultData.modified_content,
+                                    editType: resultData.edit_type || type,
+                                    editSummary: resultData.edit_summary || 'Edited',
+                                    isLoading: false,
+                                    diffData: resultData,
+                                    isPersisted: true
+                                };
+                            } else {
+                                newEditedMockupsMap[index] = {
+                                    file: {
+                                        name: tool.arguments.file_name,
+                                        id: tool.arguments.file_id,
+                                        type: 'mockup'
+                                    },
+                                    editType: type,
+                                    editSummary: 'Edited (from history)',
+                                    isLoading: false,
+                                    originalContent: null
+                                };
+                            }
+                            hasNewData = true;
+                        }
+                    }
                 });
             }
         });
@@ -443,6 +517,8 @@ export default function ProjectChat() {
         if (hasNewData) {
             setCreatedFilesMap(prev => ({ ...prev, ...newCreatedMap }));
             setEditedFilesMap(prev => ({ ...prev, ...newEditedMap }));
+            setCreatedMockupsMap(prev => ({ ...prev, ...newCreatedMockupsMap }));
+            setEditedMockupsMap(prev => ({ ...prev, ...newEditedMockupsMap }));
         }
     }, [messages]);
 
@@ -920,6 +996,131 @@ export default function ProjectChat() {
                             toast.error('Failed to edit document');
                         }
                     }
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // UI MOCKUP CREATION TOOL - Seamless mockup creation
+                    // ═══════════════════════════════════════════════════════════════
+                    if (toolCall.tool_name === 'create_mockup') {
+                        try {
+                            // Auto-execute the tool to create the mockup
+                            const result = await executeToolMutation.mutateAsync({
+                                toolName: toolCall.tool_name,
+                                arguments: toolCall.arguments
+                            });
+
+                            if (result.success && result.result) {
+                                const createdMockup = {
+                                    id: result.result.file_id,
+                                    name: result.result.name,
+                                    category: result.result.category,
+                                    type: 'mockup',
+                                    content: result.result.content
+                                };
+
+                                // Store in map for persistent card display
+                                setCreatedMockupsMap(prev => ({
+                                    ...prev,
+                                    [newAiMsgIndex]: createdMockup
+                                }));
+
+                                // Open the mockup preview panel
+                                setMockupPanelFile(createdMockup);
+                                setMockupPanelOpen(true);
+                                setShowSidebar(false); // Collapse sidebar for more space
+
+                                toast.success(`Created mockup: ${result.result.name}`, {
+                                    description: 'Preview and edit in the panel on the right'
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Mockup creation failed:', error);
+                            toast.error('Failed to create mockup');
+                        }
+                    }
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // UI MOCKUP EDITING TOOLS - Multi-step with diff preview
+                    // ═══════════════════════════════════════════════════════════════
+                    const mockupEditTools = ['rewrite_mockup', 'insert_in_mockup', 'replace_in_mockup'];
+                    if (mockupEditTools.includes(toolCall.tool_name)) {
+                        // Determine loading step text based on tool
+                        const getMockupLoadingStep = () => {
+                            switch (toolCall.tool_name) {
+                                case 'rewrite_mockup': return 'Redesigning mockup...';
+                                case 'insert_in_mockup': return 'Adding UI elements...';
+                                case 'replace_in_mockup': return 'Updating components...';
+                                default: return 'Processing...';
+                            }
+                        };
+
+                        // Set loading state in card immediately
+                        setEditedMockupsMap(prev => ({
+                            ...prev,
+                            [newAiMsgIndex]: {
+                                file: { name: toolCall.arguments.file_name },
+                                isLoading: true,
+                                loadingStep: getMockupLoadingStep()
+                            }
+                        }));
+
+                        try {
+                            // Execute the multi-step edit (reuse document edit endpoint)
+                            const result = await editDocumentMutation.mutateAsync({
+                                toolName: toolCall.tool_name,
+                                fileId: toolCall.arguments.file_id,
+                                fileName: toolCall.arguments.file_name,
+                                instructions: toolCall.arguments.instructions
+                            });
+
+                            if (result.success && result.result) {
+                                const editResult = result.result;
+                                const editedMockup = {
+                                    id: editResult.file_id,
+                                    name: editResult.file_name,
+                                    category: 'Mockups',
+                                    type: 'mockup',
+                                    content: editResult.modified_content
+                                };
+
+                                // Update the map with full edit info
+                                setEditedMockupsMap(prev => ({
+                                    ...prev,
+                                    [newAiMsgIndex]: {
+                                        file: editedMockup,
+                                        originalContent: editResult.original_content,
+                                        editType: editResult.edit_type,
+                                        editSummary: editResult.edit_summary,
+                                        isLoading: false
+                                    }
+                                }));
+
+                                // Open mockup preview panel in diff mode
+                                setMockupPanelFile(editedMockup);
+                                setMockupOriginalContent(editResult.original_content);
+                                setMockupEditSummary(editResult.edit_summary);
+                                setIsMockupDiffMode(true);
+                                setIsMockupDiffAccepted(false);
+                                setMockupPanelOpen(true);
+                                setShowSidebar(false);
+
+                                toast.success(`Mockup updated: ${editResult.file_name}`, {
+                                    description: 'Review the changes in the preview panel'
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Mockup edit failed:', error);
+                            // Update card to show error
+                            setEditedMockupsMap(prev => ({
+                                ...prev,
+                                [newAiMsgIndex]: {
+                                    ...prev[newAiMsgIndex],
+                                    isLoading: false,
+                                    loadingStep: 'Failed to edit mockup'
+                                }
+                            }));
+                            toast.error('Failed to edit mockup');
+                        }
+                    }
                 }
             }
         } catch (error) {
@@ -1001,6 +1202,115 @@ export default function ProjectChat() {
         handleCloseEditorPanel();
     };
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // MOCKUP PANEL HANDLERS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    // Close mockup panel
+    const handleCloseMockupPanel = () => {
+        setMockupPanelOpen(false);
+        setMockupPanelFile(null);
+        setIsMockupDiffMode(false);
+        setMockupOriginalContent('');
+        setMockupEditSummary('');
+        setIsMockupDiffAccepted(false);
+    };
+
+    // Accept mockup changes - save to backend
+    const handleAcceptMockupChanges = async () => {
+        if (!mockupPanelFile?.id || !mockupPanelFile?.content) return;
+
+        const fileToKeepOpen = { ...mockupPanelFile };
+
+        try {
+            await acceptChangesMutation.mutateAsync({
+                fileId: mockupPanelFile.id,
+                newContent: mockupPanelFile.content
+            });
+
+            // Close and reopen to avoid Monaco errors
+            setMockupPanelOpen(false);
+            setIsMockupDiffMode(false);
+            setMockupOriginalContent('');
+
+            setTimeout(() => {
+                setMockupPanelFile(fileToKeepOpen);
+                setMockupPanelOpen(true);
+            }, 100);
+
+            toast.success('Mockup changes applied!');
+        } catch (error) {
+            console.error('Failed to accept mockup changes:', error);
+            toast.error('Failed to save changes');
+        }
+    };
+
+    // Reject mockup changes
+    const handleRejectMockupChanges = () => {
+        toast.info('Mockup changes discarded');
+        handleCloseMockupPanel();
+    };
+
+    // Mockup content change handler
+    const handleMockupContentChange = useCallback(
+        debounce(async (fileId, newContent) => {
+            if (!fileId || !newContent) return;
+            try {
+                await updateFileMutation.mutateAsync({
+                    fileId,
+                    updates: { content: newContent }
+                });
+                setMockupPanelFile(prev => prev?.id === fileId ? { ...prev, content: newContent } : prev);
+            } catch (error) {
+                console.error('Auto-save mockup failed:', error);
+            }
+        }, 1000),
+        [updateFileMutation]
+    );
+
+    // Open mockup in full editor
+    const handleOpenMockupInFullEditor = () => {
+        if (mockupPanelFile?.id) {
+            navigate(`/project/${projectId}/editor/${mockupPanelFile.id}`);
+        }
+    };
+
+    // Mockup panel resize handlers
+    const handleResizeMouseDown = useCallback((e) => {
+        e.preventDefault();
+        isResizingMockupPanel.current = true;
+        resizeStartX.current = e.clientX;
+        resizeStartWidth.current = mockupPanelWidth;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+    }, [mockupPanelWidth]);
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isResizingMockupPanel.current) return;
+
+            // Calculate new width (dragging left increases width, right decreases)
+            const deltaX = resizeStartX.current - e.clientX;
+            const newWidth = Math.max(350, Math.min(900, resizeStartWidth.current + deltaX));
+            setMockupPanelWidth(newWidth);
+        };
+
+        const handleMouseUp = () => {
+            if (isResizingMockupPanel.current) {
+                isResizingMockupPanel.current = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
 
     // Input Handler for @ Mentions
     const handleInputChange = (e) => {
@@ -1295,7 +1605,7 @@ export default function ProjectChat() {
 
                 {/* Chat Content Section - Shrinks when editor is open */}
                 <div
-                    className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${editorPanelOpen ? 'mr-4' : ''} relative`}
+                    className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) ? 'mr-4' : ''} relative`}
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
                     onDragOver={handleDragOver}
@@ -1325,7 +1635,7 @@ export default function ProjectChat() {
 
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto pb-40" ref={scrollRef}>
-                        <div className={`mx-auto p-4 pt-14 space-y-6 transition-all duration-300 ${editorPanelOpen ? 'max-w-2xl' : 'max-w-4xl'}`}>
+                        <div className={`mx-auto p-4 pt-14 space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) ? 'max-w-2xl' : 'max-w-4xl'}`}>
                             {/* Welcome State */}
                             {messages.length === 0 && !loading && (
                                 <div className="flex flex-col items-center justify-center py-20">
@@ -1408,6 +1718,8 @@ export default function ProjectChat() {
                                         projectId={projectId}
                                         createdFile={createdFilesMap[i]}
                                         editedFile={editedFileWithStatus}
+                                        createdMockup={createdMockupsMap[i]}
+                                        editedMockup={editedMockupsMap[i]}
                                         onOpenAgentFile={() => {
                                             const fileForMessage = createdFilesMap[i];
                                             if (fileForMessage) {
@@ -1454,6 +1766,54 @@ export default function ProjectChat() {
                                                 setAgentFile(latestFile);
                                                 setIsDiffMode(false);
                                                 setEditorPanelOpen(true);
+                                                setShowSidebar(false);
+                                            }
+                                        }}
+                                        // Mockup handlers
+                                        onOpenMockupPreview={() => {
+                                            const mockupForMessage = createdMockupsMap[i];
+                                            if (mockupForMessage) {
+                                                setMockupPanelFile(mockupForMessage);
+                                                setIsMockupDiffMode(false);
+                                                setMockupPanelOpen(true);
+                                                setShowSidebar(false);
+                                            }
+                                        }}
+                                        onOpenMockupInEditor={() => {
+                                            const mockupForMessage = createdMockupsMap[i];
+                                            if (mockupForMessage?.id) {
+                                                const latest = files.find(f => f.id === mockupForMessage.id) || mockupForMessage;
+                                                navigate(`/project/${projectId}/editor/${latest.id}`);
+                                            }
+                                        }}
+                                        onViewMockupDiff={editedMockupsMap[i]?.originalContent ? () => {
+                                            const edited = editedMockupsMap[i];
+                                            if (edited) {
+                                                const latestFile = files.find(f => f.id === edited.file.id);
+                                                const mockupToShow = latestFile ? {
+                                                    ...edited.file,
+                                                    content: latestFile.content
+                                                } : {
+                                                    ...edited.file,
+                                                    content: edited.modifiedContent
+                                                };
+
+                                                setMockupPanelFile(mockupToShow);
+                                                setMockupOriginalContent(edited.originalContent);
+                                                setMockupEditSummary(edited.editSummary);
+                                                setIsMockupDiffAccepted(edited.isAccepted || false);
+                                                setIsMockupDiffMode(true);
+                                                setMockupPanelOpen(true);
+                                                setShowSidebar(false);
+                                            }
+                                        } : undefined}
+                                        onOpenEditedMockupInEditor={() => {
+                                            const edited = editedMockupsMap[i];
+                                            if (edited?.file?.id) {
+                                                const latestFile = files.find(f => f.id === edited.file.id) || edited.file;
+                                                setMockupPanelFile(latestFile);
+                                                setIsMockupDiffMode(false);
+                                                setMockupPanelOpen(true);
                                                 setShowSidebar(false);
                                             }
                                         }}
@@ -1756,6 +2116,35 @@ export default function ProjectChat() {
                     />
                 </div>
             )}
+
+            {/* Mockup Preview Panel - For UI mockups */}
+            {mockupPanelOpen && mockupPanelFile && (
+                <div
+                    className="flex-shrink-0 p-4 pl-0 relative"
+                    style={{ width: `${mockupPanelWidth}px` }}
+                >
+                    {/* Resize Handle */}
+                    <div
+                        onMouseDown={handleResizeMouseDown}
+                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+                    >
+                        <div className="absolute left-1 top-1/2 -translate-y-1/2 h-16 w-1 rounded-full bg-white/10 group-hover:bg-violet-500/50 transition-colors" />
+                    </div>
+                    <MockupPreviewPanel
+                        file={mockupPanelFile}
+                        originalContent={mockupOriginalContent}
+                        isDiffMode={isMockupDiffMode}
+                        editSummary={mockupEditSummary}
+                        onContentChange={handleMockupContentChange}
+                        onAcceptChanges={handleAcceptMockupChanges}
+                        onRejectChanges={handleRejectMockupChanges}
+                        onOpenInEditor={handleOpenMockupInFullEditor}
+                        onClose={handleCloseMockupPanel}
+                        isSaving={false}
+                        isAccepted={isMockupDiffAccepted}
+                    />
+                </div>
+            )}
         </div>
 
     );
@@ -1767,7 +2156,7 @@ export default function ProjectChat() {
 // MESSAGE BUBBLE COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function MessageBubble({ message, messageIndex, files = [], tasks = [], projectId, createdFile, editedFile, onOpenAgentFile, onOpenInFullEditor, onViewDiff, onOpenEditedInFullEditor }) {
+function MessageBubble({ message, messageIndex, files = [], tasks = [], projectId, createdFile, editedFile, createdMockup, editedMockup, onOpenAgentFile, onOpenInFullEditor, onViewDiff, onOpenEditedInFullEditor, onOpenMockupPreview, onOpenMockupInEditor, onViewMockupDiff, onOpenEditedMockupInEditor }) {
     const navigate = useNavigate();
     const [copiedCode, setCopiedCode] = useState(false);
     const [copiedMessage, setCopiedMessage] = useState(false);
@@ -2050,6 +2439,31 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
                         isAccepted={editedFile.isAccepted}
                         isStale={editedFile.isStale}
                         isPersisted={editedFile.isPersisted}
+                    />
+                )}
+
+                {/* Created Mockup Card - for AI messages that created mockups */}
+                {!isUser && createdMockup && (
+                    <CreatedMockupCard
+                        file={createdMockup}
+                        onOpen={onOpenMockupPreview}
+                        onOpenInEditor={onOpenMockupInEditor}
+                    />
+                )}
+
+                {/* Edited Mockup Card - for AI messages that edited mockups */}
+                {!isUser && editedMockup && (
+                    <EditedMockupCard
+                        file={editedMockup.file}
+                        editType={editedMockup.editType}
+                        editSummary={editedMockup.editSummary}
+                        isLoading={editedMockup.isLoading}
+                        loadingStep={editedMockup.loadingStep}
+                        onViewDiff={onViewMockupDiff}
+                        onOpenInEditor={onOpenEditedMockupInEditor}
+                        isAccepted={editedMockup.isAccepted}
+                        isStale={editedMockup.isStale}
+                        isPersisted={editedMockup.isPersisted}
                     />
                 )}
             </div>

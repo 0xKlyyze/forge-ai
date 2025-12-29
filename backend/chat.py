@@ -90,6 +90,38 @@ class DocumentEditResult(BaseModel):
     edit_type: str  # 'rewrite', 'insert', 'replace'
     edit_summary: str  # Human-readable summary of what was changed
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI MOCKUP MODELS - For JSX/TSX UI component mockups
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class CreateMockupArgs(BaseModel):
+    name: str = Field(description="Mockup name with extension (e.g., 'LoginForm.jsx', 'Dashboard.tsx')")
+    content: str = Field(description="Full JSX/TSX code for the UI mockup component. Must be a valid React component.")
+
+class RewriteMockupArgs(BaseModel):
+    file_id: str = Field(description="The ID of the mockup file to rewrite")
+    file_name: str = Field(description="The name of the mockup being rewritten (for display)")
+    instructions: str = Field(description="Instructions on how to redesign/rewrite the mockup")
+
+class InsertInMockupArgs(BaseModel):
+    file_id: str = Field(description="The ID of the mockup file to insert into")
+    file_name: str = Field(description="The name of the mockup being modified (for display)")
+    instructions: str = Field(description="What JSX elements/components to add and where")
+
+class ReplaceInMockupArgs(BaseModel):
+    file_id: str = Field(description="The ID of the mockup file to modify")
+    file_name: str = Field(description="The name of the mockup being modified (for display)")
+    instructions: str = Field(description="Which component/section to replace and what to replace it with")
+
+class MockupEditResult(BaseModel):
+    """Result of a mockup edit operation - includes both original and modified for diff view"""
+    file_id: str
+    file_name: str
+    original_content: str
+    modified_content: str
+    edit_type: str  # 'rewrite', 'insert', 'replace'
+    edit_summary: str  # Human-readable summary of what was changed
+
 # Legacy modify_document (kept for backward compatibility)
 class ModifyDocumentArgs(BaseModel):
     file_id: str = Field(description="The ID of the file to modify")
@@ -111,7 +143,7 @@ class ModifyTaskArgs(BaseModel):
     updates: dict = Field(description="Fields to update: title, description, status, priority, importance")
 
 class ToolCall(BaseModel):
-    tool_name: str = Field(description="Name of the tool: 'create_document', 'rewrite_document', 'insert_in_document', 'replace_in_document', 'create_tasks', 'modify_task'")
+    tool_name: str = Field(description="Name of the tool: 'create_document', 'rewrite_document', 'insert_in_document', 'replace_in_document', 'create_mockup', 'rewrite_mockup', 'insert_in_mockup', 'replace_in_mockup', 'create_tasks', 'modify_task'")
     arguments: dict = Field(description="Arguments for the tool call")
     status: str = Field(description="Status: 'pending', 'executing', 'success', 'error'", default="pending")
 
@@ -344,6 +376,93 @@ def get_agentic_tools():
                 },
                 "required": ["task_id", "task_title", "updates"]
             }
+        ),
+        # ═══════════════════════════════════════════════════════════════════════
+        # UI MOCKUP TOOLS - For creating and editing JSX/TSX UI components
+        # ═══════════════════════════════════════════════════════════════════════
+        types.FunctionDeclaration(
+            name="create_mockup",
+            description="Create a new UI mockup component (JSX/TSX). Use this when the user asks you to create, design, build, or make a new UI component, screen, page, form, or interface mockup.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Mockup file name with extension (e.g., 'LoginForm.jsx', 'Dashboard.tsx', 'Navbar.jsx')"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Full JSX/TSX code for the UI mockup. Must be a complete, valid React component that can be rendered. Use Tailwind CSS for styling. Include all necessary imports."
+                    }
+                },
+                "required": ["name", "content"]
+            }
+        ),
+        types.FunctionDeclaration(
+            name="rewrite_mockup",
+            description="Completely redesign/rewrite an existing UI mockup. Use this when the user asks to redesign, redo, completely change, or make major changes to a mockup's entire layout or style.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "description": "The ID of the mockup file to rewrite (from the context)"
+                    },
+                    "file_name": {
+                        "type": "string",
+                        "description": "The name of the mockup being rewritten (for display)"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": "Detailed instructions on how to redesign the mockup, what style/layout changes to make"
+                    }
+                },
+                "required": ["file_id", "file_name", "instructions"]
+            }
+        ),
+        types.FunctionDeclaration(
+            name="insert_in_mockup",
+            description="Add new UI elements/components to an existing mockup. Use this when the user asks to add, insert, or include new buttons, sections, forms, or components in a mockup.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "description": "The ID of the mockup file to insert into (from the context)"
+                    },
+                    "file_name": {
+                        "type": "string",
+                        "description": "The name of the mockup being modified (for display)"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": "What UI elements to add and where (e.g., 'Add a forgot password link below the login button', 'Insert a sidebar navigation')"
+                    }
+                },
+                "required": ["file_id", "file_name", "instructions"]
+            }
+        ),
+        types.FunctionDeclaration(
+            name="replace_in_mockup",
+            description="Replace specific UI components/sections in an existing mockup. Use this when the user asks to change, update, or replace specific parts of the UI while keeping the rest.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "description": "The ID of the mockup file to modify (from the context)"
+                    },
+                    "file_name": {
+                        "type": "string",
+                        "description": "The name of the mockup being modified (for display)"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": "Which component/section to replace and what to replace it with (e.g., 'Replace the header with a sticky navbar', 'Update the form to use cards')"
+                    }
+                },
+                "required": ["file_id", "file_name", "instructions"]
+            }
         )
     ])
 
@@ -393,6 +512,10 @@ async def generate_agentic_response(
     - "create a new file/document" → create_document
     - "rewrite this document" → rewrite_document
     - "replace/update this section" → replace_in_document
+    - "create a UI mockup/component" → create_mockup
+    - "redesign this mockup" → rewrite_mockup
+    - "add a button/section to the mockup" → insert_in_mockup
+    - "replace this UI element" → replace_in_mockup
     - "create tasks for X" → create_tasks
     - "mark task as done" → modify_task
     
@@ -409,6 +532,12 @@ async def generate_agentic_response(
     - insert_in_document: Add new content at a specific location
     - replace_in_document: Replace a specific section
     
+    UI MOCKUP TOOLS (for React/JSX components):
+    - create_mockup: Create a new UI component mockup (LoginForm.jsx, Dashboard.tsx, etc.)
+    - rewrite_mockup: Completely redesign an existing mockup
+    - insert_in_mockup: Add new UI elements (buttons, forms, sections)
+    - replace_in_mockup: Replace specific UI components
+    
     TASK TOOLS:
     - create_tasks: Create one or more tasks
     - modify_task: Update an existing task
@@ -416,6 +545,7 @@ async def generate_agentic_response(
     INSTRUCTIONS:
     - When using tools, also provide a brief message explaining what you're doing.
     - Be comprehensive when creating document content.
+    - For UI mockups: Create complete, valid React components using Tailwind CSS. Include all imports.
     - For questions, advice, feedback, or explanations - just respond naturally WITHOUT tools.
     """
 
@@ -501,6 +631,10 @@ async def generate_agentic_response(
             tool_names = [tc["tool_name"] for tc in tool_calls]
             if "create_document" in tool_names:
                 combined_text = "I'll create that document for you. You can review and edit it in the panel on the right."
+            elif "create_mockup" in tool_names:
+                combined_text = "I'll create that UI mockup for you. You can preview and edit it in the panel on the right."
+            elif any(t in tool_names for t in ["rewrite_mockup", "insert_in_mockup", "replace_in_mockup"]):
+                combined_text = "I'll update that mockup for you. You can preview the changes in the panel."
             elif "modify_document" in tool_names:
                 combined_text = "I'll update that document for you. You can review the changes in the editor panel."
             elif "create_tasks" in tool_names:
