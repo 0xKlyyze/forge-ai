@@ -5,7 +5,7 @@ import FileBrowser from '../components/FileBrowser';
 import Editor from '../components/Editor';
 import Preview from '../components/Preview';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/ui/resizable';
-import { Upload } from 'lucide-react';
+import { Upload, FileText, FileCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
 import { useProjectContext } from '../context/ProjectContext';
@@ -296,7 +296,45 @@ export default function Workspace() {
             </>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Format Toggle - only for doc files */}
+          {activeFile?.type === 'doc' && (
+            <div className="flex items-center bg-secondary/30 rounded-lg p-0.5 border border-white/5 transition-all duration-200" title="Switch document format">
+              <button
+                onClick={async () => {
+                  if (!activeFile.name.endsWith('.md')) {
+                    const newName = activeFile.name.replace(/\.[^.]+$/, '.md');
+                    await handleUpdateFile(activeFile.id, { name: newName });
+                    toast.success('Converted to Markdown');
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 ${activeFile.name.endsWith('.md')
+                    ? 'bg-primary text-primary-foreground shadow-md scale-[1.02]'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5 hover:scale-[1.02]'
+                  }`}
+              >
+                <FileText className="h-3 w-3 transition-transform duration-200" />
+                <span>Markdown</span>
+              </button>
+              <button
+                onClick={async () => {
+                  if (!activeFile.name.endsWith('.xml')) {
+                    const newName = activeFile.name.replace(/\.[^.]+$/, '.xml');
+                    await handleUpdateFile(activeFile.id, { name: newName });
+                    toast.success('Converted to XML');
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 ${activeFile.name.endsWith('.xml')
+                    ? 'bg-amber-500/90 text-white shadow-md scale-[1.02]'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5 hover:scale-[1.02]'
+                  }`}
+              >
+                <FileCode className="h-3 w-3 transition-transform duration-200" />
+                <span>XML</span>
+              </button>
+            </div>
+          )}
+
           {saving && <span className="text-xs text-muted-foreground animate-pulse">Saving...</span>}
           <div className={`h-2 w-2 rounded-full ${saving ? 'bg-yellow-500' : 'bg-green-500'}`} />
         </div>

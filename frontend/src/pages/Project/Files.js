@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import {
-    FileText, Code, Image as ImageIcon, File,
+    FileText, Code, Image as ImageIcon, File, FileCode,
     MoreVertical, ExternalLink, Search, Plus,
     LayoutGrid, List as ListIcon, Trash2, Eye, Upload, Download,
     Pin, FolderOpen, X, Check, Tag, Hash, Bot
@@ -19,6 +19,13 @@ import { formatDistanceToNow } from 'date-fns';
 import { useProjectContext } from '../../context/ProjectContext';
 import { useCreateFile, useUpdateFile, useDeleteFile } from '../../hooks/useProjectQueries';
 import { FilesSkeleton } from '../../components/skeletons/PageSkeletons';
+import { XmlPreviewCompact } from '../../components/XmlViewer';
+
+// Helper to check if a file is XML
+const isXmlFile = (filename) => {
+    const ext = filename?.split('.').pop()?.toLowerCase();
+    return ['xml', 'svg', 'xsl', 'xslt', 'xsd', 'plist', 'config'].includes(ext);
+};
 
 export default function ProjectFiles() {
     const { projectId } = useParams();
@@ -105,7 +112,7 @@ export default function ProjectFiles() {
             } else if (file.name.match(/\.(jsx?|tsx?)$/)) {
                 type = 'mockup';
                 category = 'Mockups';
-            } else if (file.name.match(/\.(md|txt|json|css|html)$/)) {
+            } else if (file.name.match(/\.(md|txt|json|css|html|xml|svg|xsl|xslt|xsd|plist|config)$/)) {
                 type = 'doc';
                 category = 'Docs';
             }
@@ -123,7 +130,7 @@ export default function ProjectFiles() {
             }
         };
 
-        const isText = file.type.startsWith('text/') || file.name.match(/\.(js|jsx|ts|tsx|md|json|css|html)$/);
+        const isText = file.type.startsWith('text/') || file.name.match(/\.(js|jsx|ts|tsx|md|json|css|html|xml|svg|xsl|xslt|xsd|plist|config)$/);
         if (isText) reader.readAsText(file);
         else reader.readAsDataURL(file);
     };
@@ -176,7 +183,7 @@ export default function ProjectFiles() {
             reader.onload = async (e) => {
                 await submitFile(name, type, newFileCategory, e.target.result);
             };
-            const isText = uploadFile.type.startsWith('text/') || uploadFile.name.match(/\.(js|jsx|ts|tsx|md|json|css|html)$/);
+            const isText = uploadFile.type.startsWith('text/') || uploadFile.name.match(/\.(js|jsx|ts|tsx|md|json|css|html|xml|svg|xsl|xslt|xsd|plist|config)$/);
             if (isText) reader.readAsText(uploadFile);
             else reader.readAsDataURL(uploadFile);
         } else {
@@ -223,8 +230,12 @@ export default function ProjectFiles() {
         window.URL.revokeObjectURL(url);
     };
 
-    const getIcon = (type) => {
+    const getIcon = (type, fileName) => {
         const iconClasses = "h-8 w-8";
+        // Check for XML files
+        if (isXmlFile(fileName)) {
+            return <FileCode className={`${iconClasses} text-amber-400`} />;
+        }
         switch (type) {
             case 'doc': return <FileText className={`${iconClasses} text-primary`} />;
             case 'mockup': return <Code className={`${iconClasses} text-accent`} />;
@@ -344,8 +355,8 @@ export default function ProjectFiles() {
                                 <button
                                     onClick={() => setShowChatFiles(!showChatFiles)}
                                     className={`h-9 px-3 rounded-xl flex items-center gap-1.5 text-xs font-medium transition-all border ${showChatFiles
-                                            ? 'bg-accent/20 border-accent/40 text-accent'
-                                            : 'bg-secondary/30 border-white/10 text-muted-foreground hover:text-foreground'
+                                        ? 'bg-accent/20 border-accent/40 text-accent'
+                                        : 'bg-secondary/30 border-white/10 text-muted-foreground hover:text-foreground'
                                         }`}
                                     title={showChatFiles ? 'Hide AI chat files' : 'Show AI chat files'}
                                 >
@@ -480,11 +491,13 @@ export default function ProjectFiles() {
                         <DialogHeader>
                             <DialogTitle className="font-mono">{previewFile?.name}</DialogTitle>
                         </DialogHeader>
-                        <div className="flex-1 bg-black/50 rounded-xl border border-white/10 p-4 overflow-auto flex items-center justify-center">
+                        <div className="flex-1 bg-black/50 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center">
                             {previewFile?.type === 'asset' && previewFile.content.startsWith('data:image') ? (
                                 <img src={previewFile.content} alt={previewFile.name} className="max-w-full max-h-full rounded-lg" />
+                            ) : isXmlFile(previewFile?.name) ? (
+                                <XmlPreviewCompact content={previewFile?.content || ''} fileName={previewFile?.name} />
                             ) : (
-                                <pre className="w-full h-full text-left font-mono text-sm whitespace-pre-wrap">
+                                <pre className="w-full h-full p-4 text-left font-mono text-sm whitespace-pre-wrap overflow-auto">
                                     {previewFile?.content || 'No content.'}
                                 </pre>
                             )}
@@ -599,7 +612,7 @@ function FileCard({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRena
                         <img src={file.content} alt={file.name} className="w-full h-full object-cover" />
                     ) : (
                         <div className="p-4 transition-transform duration-200 group-hover:scale-125">
-                            {getIcon(file.type)}
+                            {getIcon(file.type, file.name)}
                         </div>
                     )}
                 </div>
@@ -711,7 +724,7 @@ function FileListItem({ file, onOpen, onPreview, onPin, onDownload, onDelete, on
       ${file.pinned ? 'ring-2 ring-accent/30' : ''}`}>
             <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="h-10 w-10 rounded-xl bg-secondary/50 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
-                    {getIcon(file.type)}
+                    {getIcon(file.type, file.name)}
                 </div>
                 <div className="flex-1 min-w-0">
                     {isRenaming ? (

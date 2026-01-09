@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -14,6 +14,13 @@ import {
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import { Slider } from '../components/ui/slider';
+import XmlViewer from '../components/XmlViewer';
+
+// Helper to check if a file is XML
+const isXmlFile = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase();
+  return ['xml', 'svg', 'xsl', 'xslt', 'xsd', 'plist', 'config'].includes(ext);
+};
 
 // Dependency Detection Helper
 const DEPENDENCY_MAP = {
@@ -73,6 +80,23 @@ export default function Preview({ file, projectId }) {
     return localStorage.getItem(DEVICE_KEY) || 'responsive';
   });
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Animation state for smooth transitions when file format changes
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prevFileNameRef = useRef(file?.name);
+
+  // Detect file name/extension changes and trigger smooth transition
+  useEffect(() => {
+    if (file?.name && prevFileNameRef.current !== file.name) {
+      // File name changed - animate transition
+      setIsTransitioning(true);
+      const timer = setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50); // Brief delay for fade-out to complete
+      prevFileNameRef.current = file.name;
+      return () => clearTimeout(timer);
+    }
+  }, [file?.name]);
 
   // Persist zoom changes
   const handleZoomChange = (newZoom) => {
@@ -227,6 +251,16 @@ export default function Preview({ file, projectId }) {
     };
 
     if (file.type === 'doc') {
+      // Check if this doc file has an XML extension - show XML viewer
+      if (isXmlFile(file.name)) {
+        return (
+          <div className="h-full w-full bg-[#0d0d0d]" style={zoomStyle}>
+            <XmlViewer content={file.content || ''} fileName={file.name} />
+          </div>
+        );
+      }
+
+      // Default Markdown view
       return (
         <div className="h-full w-full overflow-auto bg-[#0d0d0d] flex justify-center p-4">
           <div
@@ -364,6 +398,15 @@ export default function Preview({ file, projectId }) {
       )
     }
 
+    // XML files - show with XmlViewer
+    if (isXmlFile(file.name)) {
+      return (
+        <div className="h-full w-full bg-[#0d0d0d]" style={zoomStyle}>
+          <XmlViewer content={file.content || ''} fileName={file.name} />
+        </div>
+      );
+    }
+
     return <div className="p-8 text-muted-foreground bg-[#0d0d0d] h-full flex items-center justify-center">No preview available.</div>;
   };
 
@@ -372,7 +415,15 @@ export default function Preview({ file, projectId }) {
       <div className="h-full w-full flex flex-col bg-[#0a0a0a]">
         <ZoomToolbar />
         <div className="flex-1 overflow-hidden">
-          <PreviewContent />
+          <div
+            className="h-full w-full transition-all duration-200 ease-out"
+            style={{
+              opacity: isTransitioning ? 0 : 1,
+              transform: isTransitioning ? 'scale(0.98)' : 'scale(1)',
+            }}
+          >
+            <PreviewContent />
+          </div>
         </div>
       </div>
 
@@ -380,7 +431,15 @@ export default function Preview({ file, projectId }) {
         <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] p-0 border-none bg-[#0a0a0a] overflow-hidden flex flex-col">
           <ZoomToolbar isFullscreenMode={true} />
           <div className="flex-1 overflow-hidden">
-            <PreviewContent />
+            <div
+              className="h-full w-full transition-all duration-200 ease-out"
+              style={{
+                opacity: isTransitioning ? 0 : 1,
+                transform: isTransitioning ? 'scale(0.98)' : 'scale(1)',
+              }}
+            >
+              <PreviewContent />
+            </div>
           </div>
         </DialogContent>
       </Dialog>

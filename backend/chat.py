@@ -340,6 +340,7 @@ def get_agentic_tools():
                                     "enum": ["low", "medium", "high"],
                                     "description": "Task importance"
                                 }
+                                ## TODO : Add difficulty property as well
                             },
                             "required": ["title"]
                         }
@@ -371,6 +372,7 @@ def get_agentic_tools():
                             "status": {"type": "string", "enum": ["todo", "in-progress", "done"]},
                             "priority": {"type": "string", "enum": ["low", "medium", "high"]},
                             "importance": {"type": "string", "enum": ["low", "medium", "high"]}
+                            ## TODO : Add difficulty property as well
                         }
                     }
                 },
@@ -476,6 +478,7 @@ async def generate_agentic_response(
     model_preset: str = "fast"
 ):
     """Generate an AI response with agentic tool-calling capabilities"""
+    ## TODO : Architecture change for better AI output : first API call to a fast Gemini model ONLY to determine whether a tool call is needed, and which ones are needed, then another API call, with a different prompt depending on the output of the first call (for eg. if no agentic tool call is needed, absolutely no needed to list all the available tools to the AI), this will also reduce the perceived waiting time for the user as it we'll be able to update the UI more quickly with the tool that'll be used if any
     
     # Build file context with IDs for modification
     files_with_ids = project_context.get('files', [])
@@ -674,7 +677,8 @@ async def generate_response(
         return await generate_agentic_response(
             history, message, project_context, attached_images, web_search, model_preset
         )
-    
+        
+    ## TODO : Enhance system instructions prompt engineering for better output
     system_instruction = f"""
     You are Forge AI, an expert software architect and coding assistant.
     You are helping a developer with their project: {project_context['name']}.
