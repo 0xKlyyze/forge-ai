@@ -95,6 +95,9 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     last_edited: datetime
     collaborators: List[dict] = []
+    share_token: Optional[str] = None
+    share_permissions: Optional[dict] = None
+    pending_invites: List[str] = []
 
 class FileResponse(BaseModel):
     id: str

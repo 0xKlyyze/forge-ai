@@ -18,13 +18,13 @@ const MainNavLink = ({ to, label, icon: Icon }) => (
     <NavLink
         to={to}
         className={({ isActive }) => `
-            flex flex-col items-center justify-center gap-2 w-20 h-20 rounded-2xl 
+            flex flex-col items-center justify-center gap-1.5 w-16 h-16 rounded-xl 
             transition-all duration-200 group
             ${isActive ? 'bg-primary text-primary-foreground shadow-lg scale-105' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}
         `}
     >
-        <Icon size={24} strokeWidth={2} />
-        <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
+        <Icon size={20} strokeWidth={2} />
+        <span className="text-[9px] font-medium uppercase tracking-wider">{label}</span>
     </NavLink>
 );
 
@@ -163,9 +163,9 @@ function ProjectLayoutContent() {
         <div ref={containerRef} className="h-screen w-screen bg-background flex antialiased overflow-hidden relative transition-colors duration-700">
 
             {/* Navigation Sidebar */}
-            <nav className="w-28 flex-shrink-0 flex flex-col items-center pt-10 pb-3 z-20 bg-background/50 backdrop-blur-xl h-full">
+            <nav className="w-20 flex-shrink-0 flex flex-col items-center pt-8 pb-3 z-20 bg-background/50 backdrop-blur-xl h-full">
                 {/* 1. App Icon - uses static favicon */}
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl mb-6 cursor-pointer overflow-hidden transition-transform hover:scale-105" onClick={() => navigate('/dashboard')}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-xl mb-6 cursor-pointer overflow-hidden transition-transform hover:scale-105" onClick={() => navigate('/dashboard')}>
                     <img src="/favicon-96x96.png" alt="Forge AI" className="w-full h-full object-contain" />
                 </div>
 

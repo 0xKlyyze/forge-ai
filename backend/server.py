@@ -11,6 +11,8 @@ from typing import List
 from chat import generate_response, get_available_models, edit_selection, assess_project_potential, format_content_with_lines, apply_insert, apply_replace
 from bson import ObjectId
 import os
+from email_service import send_invite_email
+from fastapi import Request
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -217,18 +219,14 @@ async def get_project(project_id: str, current_user: dict = Depends(get_current_
     collab_ids = project.get("collaborators", [])
     collabs = []
     if collab_ids:
-        # Convert str IDs to ObjectIds if needed, but they seem to be stored as str in my design? 
-        # In invite acceptance: "$addToSet": {"collaborators": current_user["id"]} -> stored as str.
-        # But wait, User IDs are usually str in responses but ObjectId in DB? 
-        # UserResponse(id=str(created_user["_id"])).
-        # In auth.py: user_id = str(user["_id"]).
-        # So they are stored as strings.
-        # But to query db.users, we need ObjectIds.
         collab_oids = [ObjectId(uid) for uid in collab_ids if ObjectId.is_valid(uid)]
         if collab_oids:
             cursor = db.users.find({"_id": {"$in": collab_oids}})
             async for u in cursor:
                 collabs.append({"id": str(u["_id"]), "email": u["email"]})
+    
+    # Fetch existing share link
+    share_link = await db.share_links.find_one({"project_id": project_id, "status": "active", "type": "view"}, sort=[("created_at", -1)])
     
     return ProjectResponse(
         id=str(project["_id"]),
@@ -240,7 +238,11 @@ async def get_project(project_id: str, current_user: dict = Depends(get_current_
         custom_categories=project.get("custom_categories", []),
         created_at=project["created_at"],
         last_edited=project["last_edited"],
-        collaborators=collabs
+        collaborators=collabs,
+
+        share_token=share_link["token"] if share_link else None,
+        share_permissions=share_link["permissions"] if share_link else None,
+        pending_invites=project.get("pending_invites", [])
     )
 
 @app.delete("/api/projects/{project_id}")
@@ -421,7 +423,7 @@ async def list_shared_tasks(token: str):
     return tasks
 
 @app.post("/api/projects/{project_id}/invites")
-async def create_invite(project_id: str, body: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def create_invite(project_id: str, request: Request, body: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create an invite link/token"""
     project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
     if not project:
@@ -442,6 +444,22 @@ async def create_invite(project_id: str, body: dict = Body(...), current_user: d
     
     await db.share_links.insert_one(invite)
     
+    invite_url = f"{request.base_url}invite/{token}"
+    # If the request comes from localhost/frontend on a different port, we might need to adjust the base URL.
+    # Usually the frontend origin is passed or known.
+    # The frontend is at http://localhost:3000 usually.
+    # The current server code returns a relative URL in the json response: f"/invite/{token}"
+    # Let's try to construct a full URL. ideally we get it from configuration. 
+    # For now, we'll try to use the Origin header or a default.
+    
+    # Construct full URL for email
+    # Assuming frontend is at localhost:3000 for dev environments if not specified
+    base_url = "http://localhost:3000" 
+    # In production this should be the deployed frontend URL.
+    # We can use the 'Referer' or 'Origin' header if available, but for email we need the absolute public link.
+    
+    full_invite_link = f"{base_url}/invite/{token}"
+    
     if email:
         # Add to pending invites on project
         await db.projects.update_one(
@@ -449,7 +467,53 @@ async def create_invite(project_id: str, body: dict = Body(...), current_user: d
             {"$addToSet": {"pending_invites": email}}
         )
         
+        # Send Email
+        # We need the project name. We already have 'project' dict.
+        inviter_email = current_user.get("email")
+        project_icon = project.get("icon", "")
+        send_invite_email(email, project["name"], full_invite_link, inviter_email, project_icon)
+        
     return {"token": token, "url": f"/invite/{token}"}
+
+@app.delete("/api/projects/{project_id}/invites/{email}")
+async def delete_pending_invite(project_id: str, email: str, current_user: dict = Depends(get_current_user)):
+    """Cancel a pending invite"""
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Remove from pending list
+    await db.projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {"$pull": {"pending_invites": email}}
+    )
+    
+    # Invalidate tokens
+    await db.share_links.update_many(
+        {"project_id": project_id, "type": "invite", "target_email": email},
+        {"$set": {"status": "revoked"}}
+    )
+    
+    return {"detail": "Invite canceled"}
+
+@app.get("/api/invites/{token}")
+async def get_invite_details(token: str):
+    """Get invite details for confirmation page"""
+    invite = await db.share_links.find_one({"token": token, "status": "active", "type": "invite"})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite")
+        
+    project = await db.projects.find_one({"_id": ObjectId(invite["project_id"])})
+    if not project:
+         raise HTTPException(status_code=404, detail="Project not found")
+         
+    inviter = await db.users.find_one({"_id": ObjectId(invite["created_by"])})
+    
+    return {
+        "project_name": project["name"],
+        "project_icon": project.get("icon", ""),
+        "inviter_email": inviter.get("email") if inviter else "Someone"
+    }
 
 @app.post("/api/invites/{token}/accept")
 async def accept_invite(token: str, current_user: dict = Depends(get_current_user)):

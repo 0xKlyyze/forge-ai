@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import {
   Upload, X, Users, Share2, Copy, Trash, Plus,
   Settings2, Globe, ShieldAlert, Check, ChevronRight,
-  ExternalLink, Calendar, Fingerprint, Info
+  ExternalLink, Calendar, Fingerprint, Info, RefreshCw
 } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -49,6 +49,29 @@ export default function ProjectSettings() {
         setProject(res.data);
         setName(res.data.name);
         setIcon(res.data.icon || '');
+
+        // Initialize share state from existing data
+        if (res.data.share_token) {
+          setGeneratedLink(res.data.share_token);
+          const perms = res.data.share_permissions || {};
+          if (perms.allow_pages) {
+            setSelectedPages(prev => {
+              const newPages = { ...prev };
+              ['home', 'tasks', 'files'].forEach(p => {
+                newPages[p] = perms.allow_pages.includes(p);
+              });
+              return newPages;
+            });
+          }
+          if (perms.allow_all_files) {
+            setFileAccessMode('all');
+          } else if (perms.allow_files && perms.allow_files.length > 0) {
+            setFileAccessMode('specific');
+            setSelectedFileIds(new Set(perms.allow_files));
+          } else {
+            setFileAccessMode('none');
+          }
+        }
       } catch (error) {
         toast.error("Failed to load settings");
       }
@@ -79,6 +102,13 @@ export default function ProjectSettings() {
     try {
       await api.post(`/projects/${projectId}/invites`, { email: inviteEmail });
       toast.success(`Invite sent to ${inviteEmail}`);
+
+      // Update local state to show pending invite immediately
+      setProject(prev => ({
+        ...prev,
+        pending_invites: [...(prev.pending_invites || []), inviteEmail]
+      }));
+
       setInviteEmail('');
     } catch (error) {
       toast.error("Failed to send invite");
@@ -106,9 +136,31 @@ export default function ProjectSettings() {
 
       const res = await api.post(`/projects/${projectId}/share`, permissions);
       setGeneratedLink(res.data.token);
-      toast.success("Public link generated");
+      toast.success("Public link updated");
     } catch (error) {
       toast.error("Failed to generate link");
+    }
+  };
+
+  const handleCancelInvite = async (email) => {
+    try {
+      await api.delete(`/projects/${projectId}/invites/${email}`);
+      toast.success("Invite canceled");
+      setProject(prev => ({
+        ...prev,
+        pending_invites: prev.pending_invites.filter(e => e !== email)
+      }));
+    } catch (error) {
+      toast.error("Failed to cancel invite");
+    }
+  };
+
+  const handleRetryInvite = async (email) => {
+    try {
+      await api.post(`/projects/${projectId}/invites`, { email });
+      toast.success(`Invite resent to ${email}`);
+    } catch (error) {
+      toast.error("Failed to resend invite");
     }
   };
 
@@ -131,45 +183,45 @@ export default function ProjectSettings() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Settings Navigation Sidebar */}
-      <aside className="w-72 border-r border-white/5 bg-black/20 backdrop-blur-md flex flex-col">
-        <div className="p-6">
-          <h2 className="text-xl font-bold tracking-tight">Settings</h2>
-          <p className="text-xs text-muted-foreground mt-1">Configure project parameters</p>
+      <aside className="w-60 border-r border-white/5 bg-black/20 backdrop-blur-md flex flex-col">
+        <div className="p-5">
+          <h2 className="text-lg font-bold tracking-tight">Settings</h2>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Configuration</p>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className="flex-1 px-2 space-y-1">
           {sections.map((section) => (
             <button
               key={section.id}
               onClick={() => setActiveSection(section.id)}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all group ${activeSection === section.id
-                  ? 'bg-primary/10 text-primary border border-primary/20'
-                  : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${activeSection === section.id
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
                 }`}
             >
               <section.icon className={`h-4 w-4 ${activeSection === section.id ? 'text-primary' : 'group-hover:text-foreground'}`} />
               <div className="text-left">
                 <p className="text-sm font-medium leading-none">{section.label}</p>
               </div>
-              {activeSection === section.id && <ChevronRight className="h-4 w-4 ml-auto opacity-50" />}
+              {activeSection === section.id && <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-50" />}
             </button>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
-          <div className="bg-secondary/20 rounded-xl p-3 border border-white/5">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+        <div className="p-3 border-t border-white/5">
+          <div className="bg-secondary/10 rounded-xl p-3 border border-white/5">
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2 font-bold uppercase tracking-widest">
               <Info className="h-3 w-3" />
               <span>Project Meta</span>
             </div>
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-[10px]">
                 <span className="text-muted-foreground uppercase">ID</span>
-                <span className="font-mono text-white/40 truncate ml-2 max-w-[100px]">{projectId}</span>
+                <span className="font-mono text-white/40 truncate ml-2 max-w-[80px]">{projectId}</span>
               </div>
               <div className="flex justify-between items-center text-[10px]">
                 <span className="text-muted-foreground uppercase">CREATED</span>
-                <span className="text-white/40">{project.created_at ? format(new Date(project.created_at), 'MMM d, yyyy') : 'Recently'}</span>
+                <span className="text-white/40">{project.created_at ? format(new Date(project.created_at), 'MMM d, yy') : 'Recently'}</span>
               </div>
             </div>
           </div>
@@ -177,19 +229,19 @@ export default function ProjectSettings() {
       </aside>
 
       {/* Settings Content Area */}
-      <main className="flex-1 overflow-y-auto p-8 lg:p-12">
-        <div className="max-w-3xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-1 overflow-y-auto p-6 lg:p-10">
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight capitalize">{activeSection.replace('-', ' ')} Settings</h1>
-              <p className="text-muted-foreground mt-1">
+              <h1 className="text-2xl font-bold tracking-tight capitalize">{activeSection.replace('-', ' ')} Settings</h1>
+              <p className="text-sm text-muted-foreground mt-1">
                 {sections.find(s => s.id === activeSection)?.description}
               </p>
             </div>
             {activeSection === 'general' && (
-              <Button onClick={handleUpdate} className="rounded-xl shadow-lg shadow-primary/20">
+              <Button onClick={handleUpdate} className="h-10 px-6 rounded-xl shadow-lg shadow-primary/20 text-sm font-bold">
                 Save Changes
               </Button>
             )}
@@ -316,6 +368,36 @@ export default function ProjectSettings() {
                           <p className="text-sm">No other team members yet.</p>
                         </div>
                       )}
+
+                      {/* Pending Invites */}
+                      {project.pending_invites && project.pending_invites.length > 0 && (
+                        <div className="space-y-3 pt-4 border-t border-white/5">
+                          <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pending Invites</Label>
+                          <div className="grid gap-2">
+                            {project.pending_invites.map((email, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 opacity-70">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/10">
+                                    <span className="text-xs font-bold text-white/50">@</span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">{email}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Awaiting Response</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg" onClick={() => handleRetryInvite(email)} title="Resend Invite">
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg" onClick={() => handleCancelInvite(email)} title="Cancel Invite">
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Invite Section */}
@@ -369,8 +451,8 @@ export default function ProjectSettings() {
                               key={page}
                               onClick={() => setSelectedPages(prev => ({ ...prev, [page]: !prev[page] }))}
                               className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${selectedPages[page]
-                                  ? 'bg-primary/5 border-primary/30 text-primary shadow-sm'
-                                  : 'bg-black/20 border-white/5 text-muted-foreground hover:border-white/10'
+                                ? 'bg-primary/5 border-primary/30 text-primary shadow-sm'
+                                : 'bg-black/20 border-white/5 text-muted-foreground hover:border-white/10'
                                 }`}
                             >
                               <Checkbox
@@ -397,8 +479,8 @@ export default function ProjectSettings() {
                               key={item.value}
                               onClick={() => setFileAccessMode(item.value)}
                               className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-1 ${fileAccessMode === item.value
-                                  ? 'bg-primary/5 border-primary/30 text-primary shadow-sm'
-                                  : 'bg-black/20 border-white/5 text-muted-foreground hover:border-white/10'
+                                ? 'bg-primary/5 border-primary/30 text-primary shadow-sm'
+                                : 'bg-black/20 border-white/5 text-muted-foreground hover:border-white/10'
                                 }`}
                             >
                               <div className="flex items-center gap-2">
