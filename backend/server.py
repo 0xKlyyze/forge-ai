@@ -507,10 +507,21 @@ async def create_invite(project_id: str, request: Request, body: dict = Body(...
     # For now, we'll try to use the Origin header or a default.
     
     # Construct full URL for email
-    # Assuming frontend is at localhost:3000 for dev environments if not specified
-    base_url = "http://localhost:3000" 
-    # In production this should be the deployed frontend URL.
-    # We can use the 'Referer' or 'Origin' header if available, but for email we need the absolute public link.
+    # Prioritize FRONTEND_URL env var, then Origin header, then Referer, default to localhost
+    base_url = os.getenv("FRONTEND_URL")
+    if not base_url:
+        origin = request.headers.get("origin")
+        if origin:
+            base_url = origin
+        else:
+            referer = request.headers.get("referer")
+            if referer:
+                # Extract scheme + netloc
+                from urllib.parse import urlparse
+                parsed = urlparse(referer)
+                base_url = f"{parsed.scheme}://{parsed.netloc}"
+            else:
+                base_url = "http://localhost:3000"
     
     full_invite_link = f"{base_url}/invite/{token}"
     
@@ -525,7 +536,12 @@ async def create_invite(project_id: str, request: Request, body: dict = Body(...
         # We need the project name. We already have 'project' dict.
         inviter_email = current_user.get("email")
         project_icon = project.get("icon", "")
-        send_invite_email(email, project["name"], full_invite_link, inviter_email, project_icon)
+        email_sent = send_invite_email(email, project["name"], full_invite_link, inviter_email, project_icon)
+        if not email_sent:
+            print(f"WARNING: Failed to send invite email to {email}")
+            raise HTTPException(status_code=500, detail="Invite created but failed to send email. Check backend logs for API Key or Domain issues.")
+        else:
+            print(f"INFO: Invite email sent successfully to {email}")
         
     return {"token": token, "url": f"/invite/{token}"}
 

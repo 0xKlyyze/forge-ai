@@ -161,6 +161,8 @@ def send_invite_email(to_email, project_name, invite_link, inviter_email=None, p
         if not resend.api_key:
             print("ERROR: RESEND_API_KEY is not set.")
             return False
+            
+        print(f"DEBUG: Sending email with API Key starting: {resend.api_key[:4]}...")
 
         html_content = get_invite_template(project_name, invite_link, inviter_email, project_icon)
         
