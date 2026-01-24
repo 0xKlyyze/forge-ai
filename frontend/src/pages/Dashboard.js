@@ -280,11 +280,14 @@ function InboxTab({ active, onCountChange }) {
   };
 
   const handleDecline = async (token) => {
-    // Basic decline (remove from view or call delete API if we had one for user side)
-    // For now we just don't have a decline endpoint for USER side yet (only owner cancel).
-    // Let's assume user just ignores OR we implement rejection status.
-    // Skipping specific decline logic for now or implement client side hide.
-    toast.info("Decline not fully implemented yet");
+    try {
+      await api.post(`/invites/${token}/decline`);
+      toast.success("Invite declined");
+      fetchInvites(); // Refresh list
+    } catch (error) {
+      console.error("Failed to decline invite", error);
+      toast.error("Failed to decline invite");
+    }
   };
 
   if (!active) return null;

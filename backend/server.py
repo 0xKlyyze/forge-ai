@@ -122,23 +122,39 @@ async def refresh_token(body: dict = Body(...)):
 
 @app.put("/api/auth/profile", response_model=UserResponse)
 async def update_profile(updates: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    print(f"DEBUG: update_profile for user {current_user['email']} with updates: {updates}")
     allowed = ["name", "handle", "avatar_url"]
     update_data = {k: v for k, v in updates.items() if k in allowed}
     
     if "handle" in update_data:
-        handle = update_data["handle"]
-        if not handle.startswith("@"):
-             handle = f"@{handle}"
-        update_data["handle"] = handle
+        raw_handle = update_data["handle"].strip()
+        if not raw_handle.startswith("@"):
+             raw_handle = f"@{raw_handle}"
         
-        # Check uniqueness
-        cursor = db.users.find({"handle": handle})
-        existing = await cursor.to_list(length=1)
-        if existing and str(existing[0]["_id"]) != current_user["id"]:
-            raise HTTPException(status_code=400, detail="Handle already taken")
+        # Enforce lowercase for consistency and uniqueness
+        handle = raw_handle.lower()
+        update_data["handle"] = handle
+        print(f"DEBUG: Processing handle update: raw='{raw_handle}' -> normalized='{handle}'")
+        
+        # Check uniqueness scan
+        # We search for any user with this handle (exact match on normalized handle)
+        # Note: If DB has mixed case handles from before, this might miss them if we don't use regex for the check too.
+        # To decide: Should we be strict/expensive here? 
+        # Let's use case-insensitive regex for the uniqueness check to completely prevent "Neo" vs "neo" duplicates regardless of how they are stored.
+        
+        collision_query = {"handle": {"$regex": f"^{handle}$", "$options": "i"}}
+        existing_users = await db.users.find(collision_query).to_list(length=10)
+        
+        print(f"DEBUG: Uniqueness check for '{handle}' found {len(existing_users)} matches.")
+        
+        for u in existing_users:
+            if str(u["_id"]) != current_user["id"]:
+                print(f"DEBUG: Handle collision detected! Requesting User: {current_user['id']}, Existing Owner: {u['_id']} ({u.get('handle')})")
+                raise HTTPException(status_code=400, detail="Handle already taken (unique check failed)")
 
     if update_data:
-        await db.users.update_one({"_id": ObjectId(current_user["id"])}, {"$set": update_data})
+        result = await db.users.update_one({"_id": ObjectId(current_user["id"])}, {"$set": update_data})
+        print(f"DEBUG: Update result: matches={result.matched_count}, modified={result.modified_count}")
         
     updated_user = await db.users.find_one({"_id": ObjectId(current_user["id"])})
     return UserResponse(
@@ -154,6 +170,8 @@ async def search_users(q: str, current_user: dict = Depends(get_current_user)):
     if len(q) < 2:
         return []
         
+    print(f"DEBUG: Searching users for query '{q}'")
+    
     query = {
         "$or": [
             {"email": {"$regex": q, "$options": "i"}},
@@ -166,6 +184,7 @@ async def search_users(q: str, current_user: dict = Depends(get_current_user)):
     users = []
     cursor = db.users.find(query).limit(5)
     async for u in cursor:
+        print(f"DEBUG: Search found user: {u.get('email')} handle={u.get('handle')}")
         users.append({
             "id": str(u["_id"]),
             "email": u["email"],
@@ -644,6 +663,29 @@ async def accept_invite(token: str, current_user: dict = Depends(get_current_use
     )
     
     return {"detail": "Joined project successfully", "project_id": project_id}
+
+@app.post("/api/invites/{token}/decline")
+async def decline_invite(token: str, current_user: dict = Depends(get_current_user)):
+    """Decline an invite token"""
+    invite = await db.share_links.find_one({"token": token, "status": "active", "type": "invite"})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite")
+        
+    project_id = invite["project_id"]
+    
+    # Remove from pending invites in project
+    await db.projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {"$pull": {"pending_invites": invite.get("target_email")}} 
+    )
+    
+    # Mark invite as declined
+    await db.share_links.update_one(
+        {"_id": invite["_id"]},
+        {"$set": {"status": "declined"}}
+    )
+    
+    return {"detail": "Invite declined"}
 
 @app.delete("/api/projects/{project_id}/collaborators/{user_id}")
 async def remove_collaborator(project_id: str, user_id: str, current_user: dict = Depends(get_current_user)):
