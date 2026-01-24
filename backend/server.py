@@ -408,13 +408,15 @@ async def list_shared_tasks(token: str):
             id=str(t["_id"]),
             project_id=t["project_id"],
             title=t["title"],
+            description=t.get("description", ""),
             status=t.get("status", "todo"),
             priority=t.get("priority", "medium"),
             importance=t.get("importance", "medium"),
             difficulty=t.get("difficulty", "medium"),
             quadrant=t.get("quadrant", "q2"),
-            created_at=t["created_at"],
-            updated_at=t.get("updated_at")
+            linked_files=t.get("linked_files", []),
+            due_date=t.get("due_date"),
+            created_at=t["created_at"]
         ))
     return tasks
 
