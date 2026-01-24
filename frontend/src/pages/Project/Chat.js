@@ -989,6 +989,9 @@ export default function ProjectChat() {
     // Debounced save for API calls only (same pattern as Workspace.js)
     const saveAgentFileContent = useCallback(
         debounce(async (fileId, content) => {
+            // Skip API call for history/transient files
+            if (fileId === 'history') return;
+
             setIsSavingFile(true);
             try {
                 await api.put(`/files/${fileId}`, { content });
@@ -1714,12 +1717,20 @@ export default function ProjectChat() {
     };
 
     // Mockup content change handler
+    // Mockup content change handler
     const handleMockupContentChange = useCallback(
         debounce(async (fileId, newContent) => {
             if (!fileId || !newContent) return;
+
+            // Allow local editing even if it's a history file, but don't save to DB
+            if (fileId === 'history') {
+                setMockupPanelFile(prev => prev?.id === fileId ? { ...prev, content: newContent } : prev);
+                return;
+            }
+
             try {
                 await updateFileMutation.mutateAsync({
-                    fileId,
+                    id: fileId,
                     updates: { content: newContent }
                 });
                 setMockupPanelFile(prev => prev?.id === fileId ? { ...prev, content: newContent } : prev);
@@ -2275,37 +2286,70 @@ export default function ProjectChat() {
                                         onViewMockupDiff={editedMockupsMap[i]?.originalContent ? () => {
                                             const edited = editedMockupsMap[i];
                                             if (edited) {
-                                                const latestFile = files.find(f => f.id === edited.file.id);
-                                                const mockupToShow = latestFile ? {
-                                                    ...edited.file,
-                                                    content: latestFile.content
-                                                } : {
-                                                    ...edited.file,
-                                                    content: edited.modifiedContent
-                                                };
+                                                // Try to resolve content safely
+                                                const latestFile = files.find(f => f.name === edited.file.name);
 
-                                                setMockupPanelFile(mockupToShow);
-                                                setMockupOriginalContent(edited.originalContent);
-                                                setMockupEditSummary(edited.editSummary);
-                                                setIsMockupDiffAccepted(edited.isAccepted || false);
-                                                setIsMockupDiffMode(true);
-                                                setMockupPanelOpen(true);
-                                                setShowSidebar(false);
+                                                // For diff view, we need BOTH original and modified.
+                                                // If we have latestFile, we can show its content as 'modified' (current state).
+                                                // If we don't, we need edited.modifiedContent.
+
+                                                const modifiedContent = latestFile ? latestFile.content : edited.modifiedContent;
+
+                                                if (modifiedContent) {
+                                                    const mockupToShow = {
+                                                        ...edited.file,
+                                                        id: latestFile?.id || edited.file.id, // Prefer real ID
+                                                        content: modifiedContent
+                                                    };
+
+                                                    setMockupPanelFile(mockupToShow);
+                                                    setMockupOriginalContent(edited.originalContent);
+                                                    setMockupEditSummary(edited.editSummary);
+                                                    setIsMockupDiffAccepted(edited.isAccepted || false);
+                                                    setIsMockupDiffMode(true);
+                                                    setMockupPanelOpen(true);
+                                                    setShowSidebar(false);
+                                                } else {
+                                                    toast.error("Diff unavailable", {
+                                                        description: "The content for this version is missing."
+                                                    });
+                                                }
                                             }
                                         } : undefined}
                                         onOpenEditedMockupInEditor={() => {
                                             const edited = editedMockupsMap[i];
-                                            if (edited?.file?.id) {
-                                                const latestFile = files.find(f => f.id === edited.file.id);
-                                                // Ensure we have content for the preview panel (critical for mock files)
-                                                const fileToShow = latestFile || {
-                                                    ...edited.file,
-                                                    content: edited.modifiedContent
-                                                };
-                                                setMockupPanelFile(fileToShow);
-                                                setIsMockupDiffMode(false);
-                                                setMockupPanelOpen(true);
-                                                setShowSidebar(false);
+                                            if (edited?.file) {
+                                                // 1. Try to find the live file in the project
+                                                const latestFile = files.find(f => f.name === edited.file.name); // Match by NAME first, as ID might be 'history'
+
+                                                // 2. Prepare the file to show
+                                                let fileToShow = null;
+
+                                                if (latestFile) {
+                                                    // Found a live version - prefer this!
+                                                    fileToShow = latestFile;
+                                                    if (edited.file.id === 'history') {
+                                                        toast.info(`Opening latest version of ${edited.file.name}`);
+                                                    }
+                                                } else if (edited.modifiedContent) {
+                                                    // No live file, but we have the edit content (rare for history items, but possible in session)
+                                                    fileToShow = {
+                                                        ...edited.file,
+                                                        content: edited.modifiedContent
+                                                    };
+                                                }
+
+                                                // 3. Open or Show Error
+                                                if (fileToShow && fileToShow.content) {
+                                                    setMockupPanelFile(fileToShow);
+                                                    setIsMockupDiffMode(false);
+                                                    setMockupPanelOpen(true);
+                                                    setShowSidebar(false);
+                                                } else {
+                                                    toast.error("Preview unavailable", {
+                                                        description: "The content for this older version is not available."
+                                                    });
+                                                }
                                             }
                                         }}
                                     />
