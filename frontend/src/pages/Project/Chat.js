@@ -335,7 +335,7 @@ const MOCK_MESSAGES = [
         role: 'tool',
         content: JSON.stringify({
             success: true,
-            result: { file_id: 'mock-landing-id', file_name: 'LandingPage', content: '...' }
+            result: { file_id: 'mock-landing-id', file_name: 'LandingPage' }
         })
     },
     {
@@ -435,7 +435,7 @@ A modern, high-converting landing page for Forge AI SaaS platform featuring glas
         role: 'tool',
         content: JSON.stringify({
             success: true,
-            result: { file_id: 'mock-brief-id', file_name: 'Project Brief - Forge AI Landing Page', content: '...' }
+            result: { file_id: 'mock-brief-id', file_name: 'Project Brief - Forge AI Landing Page' }
         })
     },
     {
@@ -845,7 +845,15 @@ export default function ProjectChat() {
                 // Determine if we have a persisted tool result for this message
                 // We look at the NEXT message to see if it's a tool output
                 const nextMsg = messages[index + 1];
-                const toolResult = (nextMsg && nextMsg.role === 'tool') ? nextMsg.content : null; // Content should be the JSON result
+                let toolResult = null;
+                if (nextMsg && nextMsg.role === 'tool') {
+                    try {
+                        toolResult = typeof nextMsg.content === 'string' ? JSON.parse(nextMsg.content) : nextMsg.content;
+                    } catch (e) {
+                        console.error('Failed to parse tool result during rehydration:', e);
+                        toolResult = null;
+                    }
+                }
 
                 msg.tool_calls.forEach(tool => {
                     // Rehydrate Created Documents
