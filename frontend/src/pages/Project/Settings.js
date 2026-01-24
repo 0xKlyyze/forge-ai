@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import {
   Upload, X, Users, Share2, Copy, Trash, Plus,
   Settings2, Globe, ShieldAlert, Check, ChevronRight,
-  ExternalLink, Calendar, Fingerprint, Info, RefreshCw
+  ExternalLink, Calendar, Fingerprint, Info, RefreshCw, Activity
 } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -33,7 +33,47 @@ export default function ProjectSettings() {
 
   // Collaboration State
   const [inviteEmail, setInviteEmail] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
+
+  // Handle Input Change for Autocomplete
+  const handleInviteInputChange = async (e) => {
+    const value = e.target.value;
+    setInviteEmail(value);
+
+    // Only search if starts with @ and has at least 1 char after it (so '@')
+    if (value.startsWith('@')) {
+      const query = value.substring(1);
+      if (query.length >= 1) {
+        setIsSearching(true);
+        setShowSuggestions(true); // Always show dropdown when typing handle
+        try {
+          // Debounce could be good, but for now direct call is okay for local dev
+          const res = await api.get(`/users/search?q=${query}`);
+          setSuggestions(res.data);
+        } catch (error) {
+          setSuggestions([]);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSuggestions([]);
+        setIsSearching(false);
+        setShowSuggestions(false);
+      }
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (user) => {
+    // If user has a handle, use it, or email
+    setInviteEmail(user.email);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   const handleToggleFile = (fileId) => {
     const newSet = new Set(selectedFileIds);
@@ -404,13 +444,55 @@ export default function ProjectSettings() {
                     <div className="pt-6 border-t border-white/5 space-y-4">
                       <div className="space-y-2">
                         <Label>Invite New Member</Label>
-                        <div className="flex gap-3">
-                          <Input
-                            placeholder="colleague@example.com"
-                            value={inviteEmail}
-                            onChange={e => setInviteEmail(e.target.value)}
-                            className="h-11 bg-black/20 border-white/10 rounded-xl"
-                          />
+                        <div className="flex gap-3 relative">
+                          <div className="relative flex-1">
+                            <Input
+                              placeholder="colleague@example.com or @handle"
+                              value={inviteEmail}
+                              onChange={handleInviteInputChange}
+                              className="h-11 bg-black/20 border-white/10 rounded-xl"
+                            />
+
+                            {/* Autocomplete Dropdown */}
+                            {showSuggestions && (
+                              <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                {isSearching ? (
+                                  <div className="p-4 text-center text-muted-foreground text-xs flex items-center justify-center gap-2">
+                                    <Activity className="w-3 h-3 animate-spin" />
+                                    Searching users...
+                                  </div>
+                                ) : suggestions.length > 0 ? (
+                                  suggestions.map((user) => (
+                                    <div
+                                      key={user.id}
+                                      onClick={() => selectSuggestion(user)}
+                                      className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5 last:border-0"
+                                    >
+                                      <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-white/10">
+                                        {user.avatar_url ? (
+                                          <img src={user.avatar_url} alt={user.handle} className="h-full w-full object-cover" />
+                                        ) : (
+                                          <span className="text-xs font-bold text-primary">{user.email[0].toUpperCase()}</span>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-bold text-white flex items-center gap-1">
+                                          {user.handle ? <span>{user.handle}</span> : <span className="italic opacity-50">No handle</span>}
+                                          {user.id === user.handle && <span className="text-[10px] bg-white/10 px-1 py-0.5 rounded ml-1">YOU</span>}
+                                        </p>
+                                        <p className="text-[10px] text-zinc-500 font-mono">{user.email}</p>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-muted-foreground text-xs">
+                                    <p className="font-semibold text-zinc-400">No user found</p>
+                                    <p className="text-[10px] mt-1 opacity-70">Try a different handle or invite via email directly.</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <Button
                             onClick={handleInvite}
                             disabled={!inviteEmail}

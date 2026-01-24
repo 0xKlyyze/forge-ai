@@ -120,6 +120,60 @@ async def refresh_token(body: dict = Body(...)):
         "token_type": "bearer"
     }
 
+@app.put("/api/auth/profile", response_model=UserResponse)
+async def update_profile(updates: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    allowed = ["name", "handle", "avatar_url"]
+    update_data = {k: v for k, v in updates.items() if k in allowed}
+    
+    if "handle" in update_data:
+        handle = update_data["handle"]
+        if not handle.startswith("@"):
+             handle = f"@{handle}"
+        update_data["handle"] = handle
+        
+        # Check uniqueness
+        cursor = db.users.find({"handle": handle})
+        existing = await cursor.to_list(length=1)
+        if existing and str(existing[0]["_id"]) != current_user["id"]:
+            raise HTTPException(status_code=400, detail="Handle already taken")
+
+    if update_data:
+        await db.users.update_one({"_id": ObjectId(current_user["id"])}, {"$set": update_data})
+        
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+    return UserResponse(
+        id=str(updated_user["_id"]),
+        email=updated_user["email"],
+        handle=updated_user.get("handle"),
+        avatar_url=updated_user.get("avatar_url")
+    )
+
+@app.get("/api/users/search")
+async def search_users(q: str, current_user: dict = Depends(get_current_user)):
+    # Simple regex search on handle or email
+    if len(q) < 2:
+        return []
+        
+    query = {
+        "$or": [
+            {"email": {"$regex": q, "$options": "i"}},
+            {"handle": {"$regex": q, "$options": "i"}},
+             {"name": {"$regex": q, "$options": "i"}}
+        ],
+        "_id": {"$ne": ObjectId(current_user["id"])} # Exclude self
+    }
+    
+    users = []
+    cursor = db.users.find(query).limit(5)
+    async for u in cursor:
+        users.append({
+            "id": str(u["_id"]),
+            "email": u["email"],
+            "handle": u.get("handle"),
+            "avatar_url": u.get("avatar_url")
+        })
+    return users
+
 # --- PROJECTS ---
 @app.post("/api/projects", response_model=ProjectResponse)
 async def create_project(project: ProjectModel, current_user: dict = Depends(get_current_user)):
@@ -514,6 +568,38 @@ async def get_invite_details(token: str):
         "project_icon": project.get("icon", ""),
         "inviter_email": inviter.get("email") if inviter else "Someone"
     }
+
+@app.get("/api/inbox")
+async def get_inbox(current_user: dict = Depends(get_current_user)):
+    """Get active invites for the current user"""
+    invites = []
+    
+    # 1. Active invites by email
+    cursor = db.share_links.find({
+        "type": "invite", 
+        "status": "active",
+        "target_email": current_user["email"]
+    }).sort("created_at", -1)
+    
+    async for invite in cursor:
+        project = await db.projects.find_one({"_id": ObjectId(invite["project_id"])})
+        if not project: continue
+        
+        inviter = await db.users.find_one({"_id": ObjectId(invite["created_by"])})
+        
+        invites.append({
+            "id": str(invite["_id"]),
+            "token": invite["token"],
+            "project_id": str(project["_id"]),
+            "project_name": project["name"],
+            "project_icon": project.get("icon", ""),
+            "inviter_email": inviter.get("email") if inviter else "Unknown",
+            "inviter_handle": inviter.get("handle"),
+            "inviter_avatar": inviter.get("avatar_url"),
+            "created_at": invite["created_at"]
+        })
+        
+    return invites
 
 @app.post("/api/invites/{token}/accept")
 async def accept_invite(token: str, current_user: dict = Depends(get_current_user)):

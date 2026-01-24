@@ -124,7 +124,27 @@ export default function Profile() {
                             </div>
 
                             <h1 className="text-3xl font-bold text-white mb-2">{user?.name || 'User'}</h1>
-                            <p className="text-muted-foreground flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full text-sm border border-white/5">
+
+                            <div className="relative group/edit">
+                                <input
+                                    defaultValue={user?.handle || ''}
+                                    placeholder="@username"
+                                    className="bg-transparent text-center text-blue-400 font-mono text-sm border-none focus:ring-0 focus:outline-none placeholder:text-blue-400/50"
+                                    onBlur={(e) => {
+                                        let val = e.target.value.trim();
+                                        if (val && !val.startsWith('@')) val = '@' + val;
+                                        if (val !== user?.handle) {
+                                            updateUser({ handle: val });
+                                            toast.success("Handle updated");
+                                        }
+                                    }}
+                                />
+                                <span className="absolute -right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover/edit:opacity-100 transition-opacity text-xs text-muted-foreground">
+                                    Edit
+                                </span>
+                            </div>
+
+                            <p className="text-muted-foreground flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full text-sm border border-white/5 mt-4">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                                 Active Account
                             </p>

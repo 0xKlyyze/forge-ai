@@ -25,6 +25,8 @@ class UserModel(BaseModel):
     email: EmailStr
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.now)
+    handle: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class ShareLinkModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
@@ -83,6 +85,8 @@ class TaskModel(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
+    handle: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class ProjectResponse(BaseModel):
     id: str
