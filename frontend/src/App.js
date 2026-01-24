@@ -18,6 +18,8 @@ import ProjectChat from './pages/Project/Chat';
 import ProjectOnboarding from './pages/Project/Onboarding';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import InviteHandler from './pages/InviteHandler';
+import SharedProjectLayout from './pages/SharedProject/Layout';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -91,6 +93,18 @@ function App() {
                 <Route path="editor/:fileId" element={<Workspace />} />
                 <Route path="tasks" element={<ProjectTasks />} />
                 <Route path="settings" element={<ProjectSettings />} />
+              </Route>
+
+              <Route path="/invite/:token" element={<InviteHandler />} />
+
+              <Route path="/s/:token" element={<SharedProjectLayout />}>
+                <Route index element={<Navigate to="home" replace />} />
+                <Route path="home" element={<ProjectHome />} />
+                <Route path="chat" element={<ProjectChat />} />
+                <Route path="tasks" element={<ProjectTasks />} />
+                <Route path="files" element={<ProjectFiles />} />
+                <Route path="editor" element={<Workspace />} />
+                <Route path="editor/:fileId" element={<Workspace />} />
               </Route>
 
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

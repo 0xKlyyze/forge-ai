@@ -10,7 +10,8 @@ import { Label } from '../../components/ui/label';
 import {
     Sparkles, Send, Globe, FileText, Bot, User, Paperclip, Plus,
     MessageSquare, Trash2, ChevronLeft, Brain, Zap, Leaf, ChevronDown,
-    Copy, Check, Clock, ArrowRight, Lightbulb, Pin, Wand2, Upload, X
+    Copy, Check, Clock, ArrowRight, Lightbulb, Pin, Wand2, Upload, X,
+    CheckSquare
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
@@ -27,6 +28,7 @@ import { SquareCheck, FileText as FileIcon } from 'lucide-react';
 import { ChatSkeleton } from '../../components/skeletons/PageSkeletons';
 import { AgentEditorPanel, CreatedDocumentCard, CreatedTasksCard, EditedDocumentCard, CreatedMockupCard, EditedMockupCard } from '../../components/chat/AgentEditorPanel';
 import { MockupPreviewPanel } from '../../components/chat/MockupPreviewPanel';
+import remarkGfm from 'remark-gfm';
 
 
 
@@ -230,6 +232,445 @@ const RichInput = React.forwardRef(({ value, onChange, onKeyDown, onPaste, onChi
 });
 RichInput.displayName = "RichInput";
 
+const MOCK_MESSAGES = [
+    {
+        role: 'user',
+        content: "I need a modern, high-converting landing page for my SaaS 'Forge AI'. It should have a hero section with a dark gradient background, a 'Features' grid, and a pricing table. Use a glassmorphism style.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString()
+    },
+    {
+        role: 'model',
+        content: "I'll create a stunning landing page for Forge AI with that modern glassmorphism aesthetic. I'll include:\n\n1. **Hero Section**: Dark gradient with glowing accents, headline, and CTA\n2. **Features Grid**: 3-column layout with icons and descriptions\n3. **Pricing Table**: Glass cards with hover effects\n\nGenerating the component now...",
+        timestamp: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
+        tool_calls: [
+            {
+                tool_name: 'create_mockup',
+                arguments: {
+                    name: 'LandingPage',
+                    content: `export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
+      
+      {/* Navbar */}
+      <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            </div>
+            Forge AI
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
+            <a href="#" className="hover:text-white transition-colors">Features</a>
+            <a href="#" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#" className="hover:text-white transition-colors">Docs</a>
+          </div>
+          <button className="px-4 py-2 bg-white text-black text-sm font-bold rounded-full hover:bg-gray-200 transition-colors">
+            Get Started
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] -z-10 mix-blend-screen" />
+        <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] -z-10 mix-blend-screen" />
+        
+        <div className="max-w-4xl mx-auto text-center space-y-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-medium text-purple-300">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+            </span>
+            v2.0 is now live
+          </div>
+          
+          <h1 className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-white via-white to-white/50 bg-clip-text text-transparent">
+            Build software <br/> at the speed of thought.
+          </h1>
+          
+          <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+            Forge AI gives you a superpower: <span className="text-white font-medium">turn natural language into full-stack applications</span> in seconds. No boilerplate, just production-ready code.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            <button className="h-12 px-8 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2">
+              Start Building Free <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+            <button className="h-12 px-8 rounded-xl bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-all backdrop-blur-sm">
+              View Demo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="py-24 px-6 relative">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { title: "Natural Language to Code", desc: "Just describe what you want, and watch Forge write the code, fix bugs, and deploy.", icon: "✨" },
+              { title: "Full-Stack Aware", desc: "Understand your entire codebase. Forge contexts switches seamlessly between frontend and backend.", icon: "🧠" },
+              { title: "Production Ready", desc: "Clean, maintainable code with best practices. Not just snippets, but entire architectures.", icon: "🚀" }
+            ].map((f, i) => (
+              <div key={i} className="p-8 rounded-3xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors backdrop-blur-sm group">
+                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-white/10 to-transparent border border-white/5 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
+                  {f.icon}
+                </div>
+                <h3 className="text-xl font-bold mb-3">{f.title}</h3>
+                <p className="text-white/60 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}`
+                }
+            }
+        ]
+    },
+    {
+        role: 'tool',
+        content: JSON.stringify({
+            success: true,
+            result: { file_id: 'mock-landing-id', file_name: 'LandingPage', content: '...' }
+        })
+    },
+    {
+        role: 'model',
+        content: "I've generated the `LandingPage` component! ✨\n\nIt features:\n- **Responsive navbar** with glassmorphism blur effect\n- **Hero section** with animated gradient glows and a live \"v2.0\" badge with pulse effect\n- **Features grid** with hover animations\n\nYou can see the **live preview** on the right. Want me to add the pricing section next, or should I break down the MVP tasks for this project?",
+        timestamp: new Date(Date.now() - 1000 * 60 * 8).toISOString()
+    },
+    {
+        role: 'user',
+        content: "Yes, break down the MVP tasks for launching this landing page. Include design, development, and deployment phases.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 6).toISOString()
+    },
+    {
+        role: 'model',
+        content: "I'll create a comprehensive task breakdown for your MVP launch. This will help you track progress and ensure nothing is missed.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+        tool_calls: [
+            {
+                tool_name: 'create_tasks',
+                arguments: {
+                    tasks: [
+                        { title: 'Finalize brand colors and typography', priority: 'high', status: 'todo' },
+                        { title: 'Design pricing section mockup', priority: 'high', status: 'todo' },
+                        { title: 'Add testimonials carousel', priority: 'medium', status: 'todo' },
+                        { title: 'Implement mobile responsive design', priority: 'high', status: 'todo' },
+                        { title: 'Set up analytics tracking', priority: 'medium', status: 'todo' },
+                        { title: 'Configure custom domain', priority: 'high', status: 'todo' },
+                        { title: 'Deploy to production', priority: 'high', status: 'todo' }
+                    ]
+                }
+            }
+        ]
+    },
+    {
+        role: 'tool',
+        content: JSON.stringify({
+            success: true,
+            result: { created: 7 }
+        })
+    },
+    {
+        role: 'model',
+        content: "Done! I've created **7 tasks** for your MVP launch:\n\n**Design Phase:**\n- Finalize brand colors and typography\n- Design pricing section mockup\n- Add testimonials carousel\n\n**Development Phase:**\n- Implement mobile responsive design\n- Set up analytics tracking\n\n**Deployment Phase:**\n- Configure custom domain\n- Deploy to production\n\nYou can view and manage all tasks in the **Tasks** tab. Would you like me to create a detailed project brief document next?",
+        timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString()
+    },
+    {
+        role: 'user',
+        content: "Yes, create a project brief document for this landing page project.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString()
+    },
+    {
+        role: 'model',
+        content: "I'll create a comprehensive project brief that you can share with your team or stakeholders.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 1).toISOString(),
+        tool_calls: [
+            {
+                tool_name: 'create_document',
+                arguments: {
+                    name: 'Project Brief - Forge AI Landing Page',
+                    category: 'Docs',
+                    content: `# Forge AI Landing Page - Project Brief
+
+## Overview
+A modern, high-converting landing page for Forge AI SaaS platform featuring glassmorphism design, dark theme, and compelling copy.
+
+## Goals
+- Achieve 5% visitor-to-signup conversion rate
+- Communicate product value within 5 seconds
+- Mobile-first responsive design
+
+## Design Direction
+- **Style**: Modern glassmorphism with subtle gradients
+- **Colors**: Dark background (#0a0a0a) with purple/blue accents
+- **Typography**: Clean, bold headlines with Inter font family
+
+## Key Sections
+1. **Hero** - Clear value proposition with animated elements
+2. **Features** - 3-column grid showcasing capabilities
+3. **Pricing** - Transparent pricing with feature comparison
+4. **Testimonials** - Social proof carousel
+5. **CTA** - Final conversion section
+
+## Timeline
+- Week 1: Design and mockups
+- Week 2: Development
+- Week 3: Testing and deployment
+
+## Success Metrics
+- Page load time < 2s
+- Mobile lighthouse score > 90
+- A/B test conversion improvements`
+                }
+            }
+        ]
+    },
+    {
+        role: 'tool',
+        content: JSON.stringify({
+            success: true,
+            result: { file_id: 'mock-brief-id', file_name: 'Project Brief - Forge AI Landing Page', content: '...' }
+        })
+    },
+    {
+        role: 'model',
+        content: "I've created the **Project Brief** document! 📄\n\nIt includes:\n- Project overview and goals\n- Design direction with color specs\n- Section breakdown\n- Timeline estimation\n- Success metrics\n\nYou can find it in the **Artifacts** tab and edit it anytime. Is there anything else you'd like me to help with for this project?",
+        timestamp: new Date(Date.now() - 1000 * 60 * 1).toISOString()
+    },
+    {
+        role: 'user',
+        content: "@[File: LandingPage.jsx] Can you add a Pricing section with 3 tiers: Free, Pro ($29/mo), and Enterprise (custom)? Make sure it matches the glassmorphism style.",
+        timestamp: new Date(Date.now() - 1000 * 60).toISOString(),
+        references: [
+            { type: 'file', name: 'LandingPage.jsx', id: 'mock-landing-id' }
+        ]
+    },
+    {
+        role: 'model',
+        content: "I'll add a beautiful pricing section to match your glassmorphism design. Inserting the new Pricing section into `LandingPage.jsx`...",
+        timestamp: new Date(Date.now() - 1000 * 55).toISOString(),
+        tool_calls: [
+            {
+                tool_name: 'insert_in_mockup',
+                arguments: {
+                    file_id: 'mock-landing-id',
+                    file_name: 'LandingPage.jsx',
+                    instructions: 'Add a Pricing section after the Features Grid with 3 tiers: Free ($0), Pro ($29/mo), and Enterprise (custom). Use glassmorphism styling with glass cards and hover effects.'
+                }
+            }
+        ]
+    },
+    {
+        role: 'tool',
+        content: JSON.stringify({
+            success: true,
+            result: {
+                file_id: 'mock-landing-id',
+                file_name: 'LandingPage.jsx',
+                edit_type: 'insert',
+                edit_summary: 'Added pricing section with 3 tiers (Free, Pro, Enterprise) using glassmorphism cards',
+                lines_changed: 87,
+                modified_content: `export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-500/30">
+      
+      {/* Navbar */}
+      <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            </div>
+            Forge AI
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
+            <a href="#" className="hover:text-white transition-colors">Features</a>
+            <a href="#" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#" className="hover:text-white transition-colors">Docs</a>
+          </div>
+          <button className="px-4 py-2 bg-white text-black text-sm font-bold rounded-full hover:bg-gray-200 transition-colors">
+            Get Started
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] -z-10 mix-blend-screen" />
+        <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] -z-10 mix-blend-screen" />
+        
+        <div className="max-w-4xl mx-auto text-center space-y-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-medium text-purple-300">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+            </span>
+            v2.0 is now live
+          </div>
+          
+          <h1 className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-white via-white to-white/50 bg-clip-text text-transparent">
+            Build software <br/> at the speed of thought.
+          </h1>
+          
+          <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+            Forge AI gives you a superpower: <span className="text-white font-medium">turn natural language into full-stack applications</span> in seconds. No boilerplate, just production-ready code.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            <button className="h-12 px-8 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2">
+              Start Building Free <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+            <button className="h-12 px-8 rounded-xl bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-all backdrop-blur-sm">
+              View Demo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="py-24 px-6 relative">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { title: "Natural Language to Code", desc: "Just describe what you want, and watch Forge write the code, fix bugs, and deploy.", icon: "✨" },
+              { title: "Full-Stack Aware", desc: "Understand your entire codebase. Forge contexts switches seamlessly between frontend and backend.", icon: "🧠" },
+              { title: "Production Ready", desc: "Clean, maintainable code with best practices. Not just snippets, but entire architectures.", icon: "🚀" }
+            ].map((f, i) => (
+              <div key={i} className="p-8 rounded-3xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors backdrop-blur-sm group">
+                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-white/10 to-transparent border border-white/5 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
+                  {f.icon}
+                </div>
+                <h3 className="text-xl font-bold mb-3">{f.title}</h3>
+                <p className="text-white/60 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-24 px-6 relative bg-gradient-to-b from-transparent to-purple-900/10">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-4xl font-bold">Simple, transparent pricing</h2>
+            <p className="text-white/60 text-lg">Choose the plan that's right for you</p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Free Tier */}
+            <div className="p-8 rounded-3xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all backdrop-blur-sm flex flex-col">
+              <h3 className="text-xl font-bold mb-2">Free</h3>
+              <div className="text-3xl font-bold mb-6">$0<span className="text-sm font-normal text-white/60">/mo</span></div>
+              <ul className="space-y-4 mb-8 flex-1">
+                <li className="flex items-center gap-3 text-white/70">
+                  <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-xs">✓</div> 3 projects
+                </li>
+                <li className="flex items-center gap-3 text-white/70">
+                  <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-xs">✓</div> Basic generation
+                </li>
+                <li className="flex items-center gap-3 text-white/70">
+                  <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-xs">✓</div> Community support
+                </li>
+              </ul>
+              <button className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 font-medium transition-colors">Start for Free</button>
+            </div>
+
+            {/* Pro Tier */}
+            <div className="p-8 rounded-3xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition-all backdrop-blur-sm relative flex flex-col">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-purple-500 text-xs font-bold shadow-lg shadow-purple-500/25">RECOMMENDED</div>
+              <h3 className="text-xl font-bold mb-2 text-purple-300">Pro</h3>
+              <div className="text-3xl font-bold mb-6">$29<span className="text-sm font-normal text-white/60">/mo</span></div>
+              <ul className="space-y-4 mb-8 flex-1">
+                <li className="flex items-center gap-3 text-white/90">
+                  <div className="h-5 w-5 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-xs">✓</div> Unlimited projects
+                </li>
+                <li className="flex items-center gap-3 text-white/90">
+                  <div className="h-5 w-5 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-xs">✓</div> Priority generation
+                </li>
+                <li className="flex items-center gap-3 text-white/90">
+                  <div className="h-5 w-5 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-xs">✓</div> Priority support
+                </li>
+                <li className="flex items-center gap-3 text-white/90">
+                  <div className="h-5 w-5 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-xs">✓</div> Export to GitHub
+                </li>
+              </ul>
+              <button className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors shadow-lg shadow-purple-500/25">Get Pro</button>
+            </div>
+
+            {/* Enterprise Tier */}
+            <div className="p-8 rounded-3xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all backdrop-blur-sm flex flex-col">
+              <h3 className="text-xl font-bold mb-2">Enterprise</h3>
+              <div className="text-3xl font-bold mb-6">Custom</div>
+              <ul className="space-y-4 mb-8 flex-1">
+                <li className="flex items-center gap-3 text-white/70">
+                  <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-xs">✓</div> Custom integrations
+                </li>
+                <li className="flex items-center gap-3 text-white/70">
+                  <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-xs">✓</div> Dedicated support
+                </li>
+                <li className="flex items-center gap-3 text-white/70">
+                  <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-xs">✓</div> SLA guarantees
+                </li>
+              </ul>
+              <button className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 font-medium transition-colors">Contact Sales</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  )
+}`
+            }
+        })
+    },
+    {
+        role: 'model',
+        content: "Done! I've added the **Pricing Section** to your landing page with 3 tiers:\n\n| Tier | Price | Highlights |\n|------|-------|------------|\n| **Free** | $0/mo | 3 projects, basic features |\n| **Pro** | $29/mo | Unlimited projects, priority support |\n| **Enterprise** | Custom | Custom integrations, dedicated support |\n\nThe cards use the same glassmorphism style with hover effects. The Pro tier is visually highlighted as the \"recommended\" option.\n\nYou can preview the changes in the **Mockups** panel on the right!",
+        timestamp: new Date(Date.now() - 1000 * 50).toISOString()
+    },
+    {
+        role: 'user',
+        content: "@[Task: Finalize brand colors and typography] I've completed the brand guidelines. Can you mark this task as done?",
+        timestamp: new Date(Date.now() - 1000 * 40).toISOString(),
+        references: [
+            { type: 'task', name: 'Finalize brand colors and typography', id: 'mock-task-1' }
+        ]
+    },
+    {
+        role: 'model',
+        content: "I'll mark that task as complete for you.",
+        timestamp: new Date(Date.now() - 1000 * 35).toISOString(),
+        tool_calls: [
+            {
+                tool_name: 'modify_task',
+                arguments: {
+                    task_id: 'mock-task-1',
+                    task_title: 'Finalize brand colors and typography',
+                    updates: { status: 'done' }
+                }
+            }
+        ]
+    },
+    {
+        role: 'tool',
+        content: JSON.stringify({
+            success: true,
+            result: { task_id: 'mock-task-1', updated: true }
+        })
+    },
+    {
+        role: 'model',
+        content: "Done! ✅ I've marked **\"Finalize brand colors and typography\"** as complete.\n\nYou now have **6 remaining tasks** for the MVP launch. Would you like me to help with any of them?\n\n---\n\n💡 **Pro Tips for using Forge AI:**\n\n**Reference anything with @mentions:**\n- Type `@` to mention files → The AI gets full context\n- Type `@` to mention tasks → Easily update or discuss tasks\n\n**Edit with precision:**\n- Select code in the editor → Click \"Add to Chat\" → Ask AI to modify just that section\n- AI can `insert`, `replace`, or `rewrite` parts of your documents and mockups\n\n**Available AI actions:**\n- 📄 Create & edit documents (specs, briefs, notes)\n- 🎨 Create & edit UI mockups (React components with live preview)\n- ✅ Create & manage tasks (with priorities and status updates)",
+        timestamp: new Date().toISOString()
+    }
+];
 
 export default function ProjectChat() {
     const { projectId } = useParams();
@@ -237,7 +678,7 @@ export default function ProjectChat() {
     const navigate = useNavigate();
 
     // Get files from context
-    const { files: contextFiles, isLoadingFiles } = useProjectContext();
+    const { files: contextFiles, isLoadingFiles, readOnly, baseUrl } = useProjectContext();
     const files = contextFiles || [];
 
     // Get tasks
@@ -337,6 +778,13 @@ export default function ProjectChat() {
 
     // Initialize session ONLY once when sessions first load
     useEffect(() => {
+        if (readOnly) {
+            // Mock mode for read-only users - always show mock messages
+            setMessages(MOCK_MESSAGES);
+            hasInitialized.current = true;
+            return;
+        }
+
         if (sessionsQuery.isLoading || hasInitialized.current) return;
 
         const sessionId = searchParams.get('session');
@@ -354,7 +802,7 @@ export default function ProjectChat() {
             createNewSession();
             hasInitialized.current = true;
         }
-    }, [sessionsQuery.isLoading, sessions.length]);
+    }, [readOnly, sessionsQuery.isLoading, sessions.length]);
 
     // Handle URL changes (when user clicks session in sidebar)
     useEffect(() => {
@@ -364,12 +812,16 @@ export default function ProjectChat() {
         }
     }, [searchParams]);
 
-    // Reset initialization when project changes
+    // Reset initialization when project changes (but skip in read-only mode)
     useEffect(() => {
+        if (readOnly) {
+            // In read-only mode, we always use mock messages, no need to reset
+            return;
+        }
         hasInitialized.current = false;
         setCurrentSessionId(null);
         setMessages([]);
-    }, [projectId]);
+    }, [projectId, readOnly]);
 
     // Auto-scroll on new messages
     useEffect(() => {
@@ -1150,10 +1602,12 @@ export default function ProjectChat() {
 
     // NOTE: handleAgentFileContentChange is defined above before the conditional return
 
-    // Open file in full editor
+    // Open file in full editor (expands the panel in chat)
     const handleOpenInFullEditor = () => {
-        if (agentFile?.id) {
-            navigate(`/project/${projectId}/editor/${agentFile.id}`);
+        // Just ensure the panel is open - user can view/edit in the expanded panel
+        if (agentFile) {
+            setEditorPanelOpen(true);
+            setShowSidebar(false);
         }
     };
 
@@ -1268,10 +1722,12 @@ export default function ProjectChat() {
         [updateFileMutation]
     );
 
-    // Open mockup in full editor
+    // Open mockup in full editor (expands the panel in chat)
     const handleOpenMockupInFullEditor = () => {
-        if (mockupPanelFile?.id) {
-            navigate(`/project/${projectId}/editor/${mockupPanelFile.id}`);
+        // Just ensure the panel is open - user can view/edit in the expanded panel
+        if (mockupPanelFile) {
+            setMockupPanelOpen(true);
+            setShowSidebar(false);
         }
     };
 
@@ -1520,85 +1976,87 @@ export default function ProjectChat() {
     return (
         <div className="h-full flex bg-background/50 relative">
 
-            {/* Chat History Sidebar */}
-            <div className={`
+            {/* Chat History Sidebar - Hidden in read-only mode */}
+            {!readOnly && (
+                <div className={`
                 ${showSidebar ? 'w-72' : 'w-0'} 
                 flex-shrink-0 border-r border-white/5 bg-black/30 backdrop-blur-sm
                 transition-all duration-300 overflow-hidden
             `}>
-                <div className="p-4 h-full flex flex-col w-72">
-                    {/* Sidebar Header */}
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold">Conversations</h3>
-                        <Button
-                            size="sm"
-                            className="h-8 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary"
-                            onClick={createNewSession}
-                        >
-                            <Plus className="h-4 w-4 mr-1" />
-                            New
-                        </Button>
-                    </div>
+                    <div className="p-4 h-full flex flex-col w-72">
+                        {/* Sidebar Header */}
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold">Conversations</h3>
+                            <Button
+                                size="sm"
+                                className="h-8 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary"
+                                onClick={createNewSession}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                New
+                            </Button>
+                        </div>
 
-                    {/* Sessions List */}
-                    <ScrollArea className="flex-1 -mx-2">
-                        <div className="space-y-1 px-2">
-                            {sessions.map(session => (
-                                <div
-                                    key={session.id}
-                                    onClick={() => loadSession(session.id)}
-                                    className={`
+                        {/* Sessions List */}
+                        <ScrollArea className="flex-1 -mx-2">
+                            <div className="space-y-1 px-2">
+                                {sessions.map(session => (
+                                    <div
+                                        key={session.id}
+                                        onClick={() => loadSession(session.id)}
+                                        className={`
                                         group flex items-center gap-2 p-2.5 rounded-xl cursor-pointer transition-all
                                         ${session.id === currentSessionId
-                                            ? 'bg-primary/20 border border-primary/30'
-                                            : 'hover:bg-white/5 border border-transparent'}
+                                                ? 'bg-primary/20 border border-primary/30'
+                                                : 'hover:bg-white/5 border border-transparent'}
                                         ${session.pinned ? 'ring-1 ring-accent/30' : ''}
                                     `}
-                                >
-                                    {/* Icon */}
-                                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${session.id === currentSessionId ? 'bg-primary/30' : 'bg-secondary/50'
-                                        }`}>
-                                        {session.pinned ? (
-                                            <Pin className="h-4 w-4 text-accent fill-accent" />
-                                        ) : (
-                                            <MessageSquare className={`h-4 w-4 ${session.id === currentSessionId ? 'text-primary' : 'text-muted-foreground'}`} />
-                                        )}
-                                    </div>
+                                    >
+                                        {/* Icon */}
+                                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${session.id === currentSessionId ? 'bg-primary/30' : 'bg-secondary/50'
+                                            }`}>
+                                            {session.pinned ? (
+                                                <Pin className="h-4 w-4 text-accent fill-accent" />
+                                            ) : (
+                                                <MessageSquare className={`h-4 w-4 ${session.id === currentSessionId ? 'text-primary' : 'text-muted-foreground'}`} />
+                                            )}
+                                        </div>
 
-                                    {/* Title - constrained width */}
-                                    <div className="flex-1 min-w-0 max-w-[120px]">
-                                        <p className="text-sm font-medium truncate">{session.title}</p>
-                                        <p className="text-[10px] text-muted-foreground truncate">
-                                            {formatDistanceToNow(new Date(session.updated_at))} ago
-                                        </p>
-                                    </div>
+                                        {/* Title - constrained width */}
+                                        <div className="flex-1 min-w-0 max-w-[120px]">
+                                            <p className="text-sm font-medium truncate">{session.title}</p>
+                                            <p className="text-[10px] text-muted-foreground truncate">
+                                                {formatDistanceToNow(new Date(session.updated_at))} ago
+                                            </p>
+                                        </div>
 
-                                    {/* Actions - always visible space reserved */}
-                                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                                        <button
-                                            onClick={(e) => togglePin(session.id, session.pinned, e)}
-                                            className={`p-1 rounded-md transition-all ${session.pinned
-                                                ? 'text-accent'
-                                                : 'opacity-0 group-hover:opacity-100 hover:bg-white/10'
-                                                }`}
-                                            title={session.pinned ? 'Unpin' : 'Pin'}
-                                        >
-                                            <Pin className={`h-3 w-3 ${session.pinned ? 'fill-current' : ''}`} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmSession(session.id); }}
-                                            className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all"
-                                            title="Delete"
-                                        >
-                                            <Trash2 className="h-3 w-3" />
-                                        </button>
+                                        {/* Actions - always visible space reserved */}
+                                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                                            <button
+                                                onClick={(e) => togglePin(session.id, session.pinned, e)}
+                                                className={`p-1 rounded-md transition-all ${session.pinned
+                                                    ? 'text-accent'
+                                                    : 'opacity-0 group-hover:opacity-100 hover:bg-white/10'
+                                                    }`}
+                                                title={session.pinned ? 'Unpin' : 'Pin'}
+                                            >
+                                                <Pin className={`h-3 w-3 ${session.pinned ? 'fill-current' : ''}`} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDeleteConfirmSession(session.id); }}
+                                                className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all"
+                                                title="Delete"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    </ScrollArea>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Main Chat Area - Now a horizontal flex container */}
             <div className="flex-1 flex min-w-0 relative">
@@ -1625,19 +2083,21 @@ export default function ProjectChat() {
                             </div>
                         </div>
                     )}
-                    {/* Toggle Sidebar Button */}
-                    <button
-                        onClick={() => setShowSidebar(!showSidebar)}
-                        className="absolute top-4 left-4 z-10 p-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
-                    >
-                        <ChevronLeft className={`h-4 w-4 transition-transform ${showSidebar ? '' : 'rotate-180'}`} />
-                    </button>
+                    {/* Toggle Sidebar Button - Hidden in read-only mode */}
+                    {!readOnly && (
+                        <button
+                            onClick={() => setShowSidebar(!showSidebar)}
+                            className="absolute top-4 left-4 z-10 p-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+                        >
+                            <ChevronLeft className={`h-4 w-4 transition-transform ${showSidebar ? '' : 'rotate-180'}`} />
+                        </button>
+                    )}
 
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto pb-40" ref={scrollRef}>
                         <div className={`mx-auto p-4 pt-14 space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) ? 'max-w-2xl' : 'max-w-4xl'}`}>
-                            {/* Welcome State */}
-                            {messages.length === 0 && !loading && (
+                            {/* Welcome State - Only show for authenticated users, not in read-only demo mode */}
+                            {messages.length === 0 && !loading && !readOnly && (
                                 <div className="flex flex-col items-center justify-center py-20">
                                     <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-primary/30 to-accent/20 flex items-center justify-center mb-6 border border-primary/30">
                                         <Sparkles className="h-10 w-10 text-primary" />
@@ -1663,6 +2123,17 @@ export default function ProjectChat() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Read-only mode: Show loading while mock messages are being set */}
+                            {readOnly && messages.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-20">
+                                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/30 to-accent/20 flex items-center justify-center mb-4 border border-primary/30">
+                                        <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                                    </div>
+                                    <p className="text-muted-foreground text-sm">Loading demo conversation...</p>
+                                </div>
+                            )}
+
                             {/* Messages */}
                             {messages.map((msg, i) => {
                                 // Skip persisted tool outputs (they are for rehydration only)
@@ -1730,11 +2201,14 @@ export default function ProjectChat() {
                                             }
                                         }}
                                         onOpenInFullEditor={() => {
-                                            // Use latest file version
+                                            // Open in expanded panel instead of navigating away
                                             const fileForMessage = createdFilesMap[i];
-                                            if (fileForMessage?.id) {
+                                            if (fileForMessage) {
                                                 const latest = files.find(f => f.id === fileForMessage.id) || fileForMessage;
-                                                navigate(`/project/${projectId}/editor/${latest.id}`);
+                                                setAgentFile(latest);
+                                                setIsDiffMode(false);
+                                                setEditorPanelOpen(true);
+                                                setShowSidebar(false);
                                             }
                                         }}
                                         onViewDiff={editedFileWithStatus?.originalContent ? () => {
@@ -1780,10 +2254,14 @@ export default function ProjectChat() {
                                             }
                                         }}
                                         onOpenMockupInEditor={() => {
+                                            // Open in expanded panel instead of navigating away
                                             const mockupForMessage = createdMockupsMap[i];
-                                            if (mockupForMessage?.id) {
+                                            if (mockupForMessage) {
                                                 const latest = files.find(f => f.id === mockupForMessage.id) || mockupForMessage;
-                                                navigate(`/project/${projectId}/editor/${latest.id}`);
+                                                setMockupPanelFile(latest);
+                                                setIsMockupDiffMode(false);
+                                                setMockupPanelOpen(true);
+                                                setShowSidebar(false);
                                             }
                                         }}
                                         onViewMockupDiff={editedMockupsMap[i]?.originalContent ? () => {
@@ -1810,8 +2288,13 @@ export default function ProjectChat() {
                                         onOpenEditedMockupInEditor={() => {
                                             const edited = editedMockupsMap[i];
                                             if (edited?.file?.id) {
-                                                const latestFile = files.find(f => f.id === edited.file.id) || edited.file;
-                                                setMockupPanelFile(latestFile);
+                                                const latestFile = files.find(f => f.id === edited.file.id);
+                                                // Ensure we have content for the preview panel (critical for mock files)
+                                                const fileToShow = latestFile || {
+                                                    ...edited.file,
+                                                    content: edited.modifiedContent
+                                                };
+                                                setMockupPanelFile(fileToShow);
                                                 setIsMockupDiffMode(false);
                                                 setMockupPanelOpen(true);
                                                 setShowSidebar(false);
@@ -1882,187 +2365,205 @@ export default function ProjectChat() {
                                 </div>
                             )}
 
-                            {/* Toolbar */}
-                            <div className="flex items-center justify-between px-4 py-2.5 bg-black/70 backdrop-blur-xl border border-white/10 border-b-0 rounded-t-2xl">
-                                <div className="flex items-center gap-3">
-                                    {/* Model Selector */}
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowModelPicker(!showModelPicker)}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 transition-colors text-xs ${getModelColor(modelPreset)}`}
-                                        >
-                                            {getModelIcon(modelPreset)}
-                                            <span>{models[modelPreset]?.name || 'Fast'}</span>
-                                            <ChevronDown className="h-3 w-3 opacity-50" />
-                                        </button>
-                                        {showModelPicker && (
-                                            <div className="absolute bottom-full mb-2 left-0 w-56 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                                                {Object.entries(models).map(([key, model]) => (
-                                                    <button
-                                                        key={key}
-                                                        type="button"
-                                                        onClick={() => { setModelPreset(key); setShowModelPicker(false); }}
-                                                        className={`w-full text-left px-4 py-3 hover:bg-primary/10 flex items-center gap-3 transition-colors ${modelPreset === key ? 'bg-primary/20' : ''}`}
-                                                    >
-                                                        <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${getModelColor(key)} bg-secondary/50`}>
-                                                            {getModelIcon(key)}
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-sm font-medium">{model.name}</div>
-                                                            <div className="text-xs text-muted-foreground">{model.description}</div>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
+                            {/* Toolbar - Hidden in read-only mode */}
+                            {!readOnly && (
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-black/70 backdrop-blur-xl border border-white/10 border-b-0 rounded-t-2xl">
+                                    <div className="flex items-center gap-3">
+                                        {/* Model Selector */}
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowModelPicker(!showModelPicker)}
+                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 transition-colors text-xs ${getModelColor(modelPreset)}`}
+                                            >
+                                                {getModelIcon(modelPreset)}
+                                                <span>{models[modelPreset]?.name || 'Fast'}</span>
+                                                <ChevronDown className="h-3 w-3 opacity-50" />
+                                            </button>
+                                            {showModelPicker && (
+                                                <div className="absolute bottom-full mb-2 left-0 w-56 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                                                    {Object.entries(models).map(([key, model]) => (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            onClick={() => { setModelPreset(key); setShowModelPicker(false); }}
+                                                            className={`w-full text-left px-4 py-3 hover:bg-primary/10 flex items-center gap-3 transition-colors ${modelPreset === key ? 'bg-primary/20' : ''}`}
+                                                        >
+                                                            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${getModelColor(key)} bg-secondary/50`}>
+                                                                {getModelIcon(key)}
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm font-medium">{model.name}</div>
+                                                                <div className="text-xs text-muted-foreground">{model.description}</div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="h-5 w-px bg-white/10" />
+
+                                        {/* Toggles */}
+                                        <div className="flex items-center gap-2">
+                                            <Switch id="web-search" checked={isWebSearch} onCheckedChange={setIsWebSearch} className="scale-90" />
+                                            <Label htmlFor="web-search" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                                                <Globe className="h-3.5 w-3.5" /> Web
+                                            </Label>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Switch id="full-context" checked={isFullContext} onCheckedChange={setIsFullContext} className="scale-90" />
+                                            <Label htmlFor="full-context" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                                                <Paperclip className="h-3.5 w-3.5" /> All Files
+                                            </Label>
+                                        </div>
                                     </div>
 
-                                    <div className="h-5 w-px bg-white/10" />
-
-                                    {/* Toggles */}
-                                    <div className="flex items-center gap-2">
-                                        <Switch id="web-search" checked={isWebSearch} onCheckedChange={setIsWebSearch} className="scale-90" />
-                                        <Label htmlFor="web-search" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
-                                            <Globe className="h-3.5 w-3.5" /> Web
-                                        </Label>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <Switch id="full-context" checked={isFullContext} onCheckedChange={setIsFullContext} className="scale-90" />
-                                        <Label htmlFor="full-context" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
-                                            <Paperclip className="h-3.5 w-3.5" /> All Files
-                                        </Label>
-                                    </div>
+                                    {/* Referenced Items (Mentions) ONLY - Attachment chips removal since they are inline now */}
+                                    {referencedItems.length > 0 && (
+                                        <div className="flex items-center gap-2 overflow-x-auto max-w-xl no-scrollbar">
+                                            {referencedItems.map((item, idx) => (
+                                                <span key={`ref-${item.type}-${item.id}-${idx}`} className={`text-xs px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
+                                                    }`}>
+                                                    {item.type === 'task' ? <SquareCheck className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                                                    <span className="truncate max-w-[80px]">{item.name || item.title}</span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-
-                                {/* Referenced Items (Mentions) ONLY - Attachment chips removal since they are inline now */}
-                                {referencedItems.length > 0 && (
-                                    <div className="flex items-center gap-2 overflow-x-auto max-w-xl no-scrollbar">
-                                        {referencedItems.map((item, idx) => (
-                                            <span key={`ref-${item.type}-${item.id}-${idx}`} className={`text-xs px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
-                                                }`}>
-                                                {item.type === 'task' ? <SquareCheck className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
-                                                <span className="truncate max-w-[80px]">{item.name || item.title}</span>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            )}
 
                             {/* Input Box - Contains file chips + input + buttons */}
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    handleSend(e);
-                                }}
-                                className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-b-2xl border-t-0 border-white/10"
-                            >
-                                {/* Uploaded Files Preview - Inside form for visual cohesion */}
-                                {uploadedFiles.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2 border-b border-white/5">
-                                        {uploadedFiles.map(file => (
-                                            <div
-                                                key={file.id}
-                                                className="group flex items-center gap-1.5 px-2 py-1 bg-primary/15 hover:bg-primary/25 border border-primary/30 rounded-lg text-xs transition-all"
-                                            >
-                                                {/* Image thumbnail or file icon */}
-                                                {file.type === 'image' ? (
-                                                    <img
-                                                        src={file.dataUrl}
-                                                        alt={file.name}
-                                                        className="h-6 w-6 rounded object-cover shrink-0"
-                                                    />
-                                                ) : (
-                                                    <Upload className="h-3 w-3 text-primary shrink-0" />
-                                                )}
-                                                <span className="truncate max-w-[100px] text-primary font-medium">{file.name}</span>
-                                                <span className="text-muted-foreground text-[10px]">
-                                                    {file.size > 1024 * 1024
-                                                        ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
-                                                        : `${(file.size / 1024).toFixed(0)}KB`
-                                                    }
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeUploadedFile(file.id)}
-                                                    className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-primary/60 hover:text-white transition-colors"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        ))}
+                            {readOnly ? (
+                                <div className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/10 p-5 flex items-center justify-center text-center gap-4">
+                                    <div className="flex-1">
+                                        <p className="text-sm text-muted-foreground">
+                                            <span className="text-white font-medium">Want to try this yourself?</span> Create a free account to start building with Forge AI.
+                                        </p>
                                     </div>
-                                )}
-
-                                {/* Input Row */}
-                                <div className="flex items-end min-h-[56px]">
-                                    <div className="flex-1 relative min-h-[56px]">
-                                        <RichInput
-                                            ref={inputRef}
-                                            value={input}
-                                            onChange={handleInputChange}
-                                            onPaste={handlePaste}
-                                            onChipDelete={(tagContent) => {
-                                                // Parse the tag to get the name, e.g. "@[File: filename.md]" -> "filename.md"
-                                                const fileMatch = tagContent.match(/@\[File: ([^\]]+)\]/);
-                                                const taskMatch = tagContent.match(/@\[Task: ([^\]]+)\]/);
-
-                                                if (fileMatch) {
-                                                    const fileName = fileMatch[1];
-                                                    setReferencedItems(prev => prev.filter(item =>
-                                                        !(item.type === 'file' && item.name === fileName)
-                                                    ));
-                                                } else if (taskMatch) {
-                                                    const taskTitle = taskMatch[1];
-                                                    setReferencedItems(prev => prev.filter(item =>
-                                                        !(item.type === 'task' && item.title === taskTitle)
-                                                    ));
-                                                }
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleSend(e);
-                                                }
-                                            }}
-                                            placeholder="Ask anything... (@ to reference files/tasks)"
-                                            className="w-full min-h-[56px] max-h-[200px] overflow-y-auto rounded-bl-2xl bg-transparent"
-                                        />
-                                    </div>
-                                    <div className="h-[56px] flex items-center gap-1 pr-2">
-                                        {/* Hidden File Input */}
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            multiple
-                                            accept=".md,.txt,.json,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.go,.rs,.yaml,.yml,.xml,.html,.css,.scss,.png,.jpg,.jpeg,.gif,.webp,image/*"
-                                            className="hidden"
-                                            onChange={handleFileInputChange}
-                                        />
-                                        {/* Upload Button */}
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="h-10 w-10 rounded-xl hover:bg-primary/10 transition-all shrink-0 text-muted-foreground hover:text-primary"
-                                            title="Upload files"
-                                        >
-                                            <Paperclip className="h-5 w-5" />
-                                        </Button>
-                                        {/* Send Button */}
-                                        <Button
-                                            type="submit"
-                                            size="icon"
-                                            disabled={loading || (!input.trim() && attachedSelections.length === 0 && uploadedFiles.length === 0)}
-                                            className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all shrink-0"
-                                        >
-                                            <Send className="h-5 w-5" />
-                                        </Button>
-                                    </div>
+                                    <Button
+                                        onClick={() => window.location.href = '/register'}
+                                        className="rounded-xl px-6 font-semibold shadow-lg shadow-primary/25 flex-shrink-0"
+                                    >
+                                        Get Started <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
                                 </div>
-                            </form>
+                            ) : (
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleSend(e);
+                                    }}
+                                    className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-b-2xl border-t-0 border-white/10"
+                                >
+                                    {/* Uploaded Files Preview - Inside form for visual cohesion */}
+                                    {uploadedFiles.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2 border-b border-white/5">
+                                            {uploadedFiles.map(file => (
+                                                <div
+                                                    key={file.id}
+                                                    className="group flex items-center gap-1.5 px-2 py-1 bg-primary/15 hover:bg-primary/25 border border-primary/30 rounded-lg text-xs transition-all"
+                                                >
+                                                    {/* Image thumbnail or file icon */}
+                                                    {file.type === 'image' ? (
+                                                        <img
+                                                            src={file.dataUrl}
+                                                            alt={file.name}
+                                                            className="h-6 w-6 rounded object-cover shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <Upload className="h-3 w-3 text-primary shrink-0" />
+                                                    )}
+                                                    <span className="truncate max-w-[100px] text-primary font-medium">{file.name}</span>
+                                                    <span className="text-muted-foreground text-[10px]">
+                                                        {file.size > 1024 * 1024
+                                                            ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
+                                                            : `${(file.size / 1024).toFixed(0)}KB`
+                                                        }
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeUploadedFile(file.id)}
+                                                        className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-primary/60 hover:text-white transition-colors"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Input Row */}
+                                    <div className="flex items-end min-h-[56px]">
+                                        <div className="flex-1 relative min-h-[56px]">
+                                            <RichInput
+                                                ref={inputRef}
+                                                value={input}
+                                                onChange={handleInputChange}
+                                                onPaste={handlePaste}
+                                                onChipDelete={(tagContent) => {
+                                                    // Parse the tag to get the name, e.g. "@[File: filename.md]" -> "filename.md"
+                                                    const fileMatch = tagContent.match(/@\[File: ([^\]]+)\]/);
+                                                    const taskMatch = tagContent.match(/@\[Task: ([^\]]+)\]/);
+
+                                                    if (fileMatch) {
+                                                        const fileName = fileMatch[1];
+                                                        setReferencedItems(prev => prev.filter(item =>
+                                                            !(item.type === 'file' && item.name === fileName)
+                                                        ));
+                                                    } else if (taskMatch) {
+                                                        const taskTitle = taskMatch[1];
+                                                        setReferencedItems(prev => prev.filter(item =>
+                                                            !(item.type === 'task' && item.title === taskTitle)
+                                                        ));
+                                                    }
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleSend(e);
+                                                    }
+                                                }}
+                                                placeholder="Ask anything... (@ to reference files/tasks)"
+                                                className="w-full min-h-[56px] max-h-[200px] overflow-y-auto rounded-bl-2xl bg-transparent"
+                                            />
+                                        </div>
+                                        <div className="h-[56px] flex items-center gap-1 pr-2">
+                                            {/* Hidden File Input */}
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                multiple
+                                                accept=".md,.txt,.json,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.go,.rs,.yaml,.yml,.xml,.html,.css,.scss,.png,.jpg,.jpeg,.gif,.webp,image/*"
+                                                className="hidden"
+                                                onChange={handleFileInputChange}
+                                            />
+                                            {/* Upload Button */}
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="h-10 w-10 rounded-xl hover:bg-primary/10 transition-all shrink-0 text-muted-foreground hover:text-primary"
+                                                title="Upload files"
+                                            >
+                                                <Paperclip className="h-5 w-5" />
+                                            </Button>
+                                            {/* Send Button */}
+                                            <Button
+                                                type="submit"
+                                                size="icon"
+                                                disabled={loading || (!input.trim() && attachedSelections.length === 0 && uploadedFiles.length === 0)}
+                                                className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all shrink-0"
+                                            >
+                                                <Send className="h-5 w-5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2175,17 +2676,21 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
     };
 
     const handleReferenceClick = (type, name) => {
+        if (readOnly) {
+            toast.info(`Sign up to explore ${type.toLowerCase()}s in detail!`);
+            return;
+        }
         if (type === 'File') {
             const file = files.find(f => f.name === name);
             if (file) {
-                navigate(`/project/${projectId}/editor/${file.id}`);
+                navigate(`${baseUrl}/editor/${file.id}`);
             } else {
                 toast.error(`File "${name}" not found in this project`);
             }
         } else if (type === 'Task') {
             const task = tasks.find(t => t.title === name);
             if (task) {
-                navigate(`/project/${projectId}/tasks`);
+                navigate(`${baseUrl}/tasks`);
                 toast.success(`Navigating to task: ${name}`);
             } else {
                 toast.error(`Task "${name}" not found`);
@@ -2206,8 +2711,10 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
         // Pattern: @[File: name]
         processed = processed.replace(/@\[(File|Task): ([^\]]+)\]/g, (match, type, content) => {
             // encode content to be safe in URL
-            const safeContent = encodeURIComponent(content);
-            return `[${content}](chip://${type}/${safeContent})`;
+            // Trim content to avoid visual glitches in the link text
+            const cleanContent = content.trim();
+            const safeContent = encodeURIComponent(cleanContent);
+            return `[${cleanContent}](chip://${type}/${safeContent})`;
         });
 
         // 2. Handle legacy references (if any)
@@ -2217,9 +2724,8 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
                 const escapedName = ref.name.replace(/[.*+?^${ }()|[\]\\]/g, '\\$&');
                 const regex = new RegExp(`(?<![\\w-])${escapedName}(?![\\w-])`, 'g');
                 // Avoid replacing inside existing chip links
-                // This is a naive check; ideally use a parser. 
-                // But since we just replaced tags, we might be safe if we don't overlap.
-                if (!processed.includes(`](chip://${ref.type}/`)) {
+                // Use case-insensitive check because chip link uses TitleCase (File) but ref might be lowercase (file)
+                if (!processed.toLowerCase().includes(`](chip://${ref.type.toLowerCase()}/`)) {
                     processed = processed.replace(regex, `[${ref.name}](forgeref://${ref.type}/${ref.name})`);
                 }
             });
@@ -2298,6 +2804,7 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
                     </div>
                 )}
                 <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     urlTransform={(url) => {
                         if (url.startsWith('forgeref://') || url.startsWith('chip://')) return url;
                         return url;

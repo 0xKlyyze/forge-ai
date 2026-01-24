@@ -64,7 +64,7 @@ import { TasksSkeleton } from '../../components/skeletons/PageSkeletons';
 
 export default function ProjectTasks() {
     const { projectId } = useParams();
-    const { tasks, isLoadingTasks } = useProjectContext();
+    const { tasks, isLoadingTasks, readOnly } = useProjectContext();
     const [activeId, setActiveId] = useState(null);
     const [activeView, setActiveView] = useState('kanban');
 
@@ -137,7 +137,10 @@ export default function ProjectTasks() {
         useSensor(KeyboardSensor)
     );
 
-    const handleDragStart = (event) => setActiveId(event.active.id);
+    const handleDragStart = (event) => {
+        if (readOnly) return;
+        setActiveId(event.active.id);
+    };
 
     const handleDragEnd = (event) => {
         const { active, over } = event;
@@ -343,6 +346,7 @@ export default function ProjectTasks() {
 
 function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, onCreateTask, onToggle, onDelete, onUpdate, isDragging }) {
     const { setNodeRef, isOver } = useDroppable({ id });
+    const { readOnly } = useProjectContext();
     const [quickAdd, setQuickAdd] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const inputRef = useRef(null);
@@ -386,14 +390,16 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
                         <span className="font-semibold text-sm">{title}</span>
                         <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">{tasks.length}</span>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 rounded-lg hover:bg-white/10"
-                        onClick={() => { setIsAdding(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-                    >
-                        <Plus className="h-4 w-4" />
-                    </Button>
+                    {!readOnly && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-lg hover:bg-white/10"
+                            onClick={() => { setIsAdding(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+                        >
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
 
                 {/* Quick Add */}
@@ -430,11 +436,13 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
                             </div>
                         </div>
                     ) : (
-                        /* Always visible inline add at TOP - hide when dragging */
-                        <InlineTaskAdd
-                            onAdd={onCreateTask}
-                            placeholder={tasks.length === 0 ? 'Add your first task...' : 'Add another task...'}
-                        />
+                        /* Always visible inline add at TOP - hide when dragging or readOnly */
+                        !readOnly && (
+                            <InlineTaskAdd
+                                onAdd={onCreateTask}
+                                placeholder={tasks.length === 0 ? 'Add your first task...' : 'Add another task...'}
+                            />
+                        )
                     )}
 
                     {tasks.map(task => (
@@ -448,7 +456,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
                     ))}
                 </div>
             </ScrollArea>
-        </div>
+        </div >
     );
 }
 
@@ -458,6 +466,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
 
 function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onToggle, onDelete, onUpdate, isDragging }) {
     const { setNodeRef, isOver } = useDroppable({ id });
+    const { readOnly } = useProjectContext();
     const [quickAdd, setQuickAdd] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const inputRef = useRef(null);
@@ -523,14 +532,17 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
                         <h3 className={`font-bold text-sm uppercase tracking-wide ${headerColors[color]}`}>{title}</h3>
                         <p className="text-[10px] text-muted-foreground">{subtitle}</p>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 rounded-lg hover:bg-white/10"
-                        onClick={() => { setIsAdding(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-                    >
-                        <Plus className="h-4 w-4" />
-                    </Button>
+
+                    {!readOnly && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-lg hover:bg-white/10"
+                            onClick={() => { setIsAdding(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+                        >
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
 
                 {isAdding && (
@@ -566,11 +578,13 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
                         </div>
                     ) : (
                         /* Always visible inline add at TOP - hide when dragging */
-                        <InlineTaskAdd
-                            onAdd={onCreateTask}
-                            placeholder="Add task..."
-                            compact
-                        />
+                        !readOnly && (
+                            <InlineTaskAdd
+                                onAdd={onCreateTask}
+                                placeholder="Add task..."
+                                compact
+                            />
+                        )
                     )}
 
                     {tasks.map(task => (
@@ -595,6 +609,7 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
 
 
 function ListView({ tasks, onToggle, onDelete, onUpdate, onCreateTask }) {
+    const { readOnly } = useProjectContext();
     const [quickAdd, setQuickAdd] = useState('');
     const [sortBy, setSortBy] = useState('newest'); // newest, priority, importance, difficulty
 
@@ -642,20 +657,22 @@ function ListView({ tasks, onToggle, onDelete, onUpdate, onCreateTask }) {
     return (
         <div className="h-full flex flex-col rounded-2xl bg-secondary/20 border border-white/10 overflow-hidden">
             {/* Quick Add */}
-            <form onSubmit={handleQuickAdd} className="flex-shrink-0 p-4 border-b border-white/5">
-                <div className="flex gap-2">
-                    <Input
-                        value={quickAdd}
-                        onChange={(e) => setQuickAdd(e.target.value)}
-                        placeholder="Add a new task..."
-                        className="flex-1 h-10 bg-background/50 border-white/10 rounded-xl"
-                    />
-                    <Button type="submit" className="h-10 px-4 rounded-xl" disabled={!quickAdd.trim()}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add
-                    </Button>
-                </div>
-            </form>
+            {!readOnly && (
+                <form onSubmit={handleQuickAdd} className="flex-shrink-0 p-4 border-b border-white/5">
+                    <div className="flex gap-2">
+                        <Input
+                            value={quickAdd}
+                            onChange={(e) => setQuickAdd(e.target.value)}
+                            placeholder="Add a new task..."
+                            className="flex-1 h-10 bg-background/50 border-white/10 rounded-xl"
+                        />
+                        <Button type="submit" className="h-10 px-4 rounded-xl" disabled={!quickAdd.trim()}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add
+                        </Button>
+                    </div>
+                </form>
+            )}
 
             {/* Header - with Sort Controls */}
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
@@ -830,6 +847,7 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
 
 function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+    const { readOnly } = useProjectContext();
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(task.title);
 
@@ -877,20 +895,22 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
             <CardContent className={compact ? 'p-2' : 'p-3'}>
                 <div className="flex items-start gap-2">
                     {/* Drag Handle */}
-                    <div
-                        {...attributes}
-                        {...listeners}
-                        className="mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing p-0.5 -ml-1 rounded hover:bg-white/10 transition-colors touch-none"
-                        title="Drag to move"
-                    >
-                        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                    </div>
+                    {!readOnly && (
+                        <div
+                            {...attributes}
+                            {...listeners}
+                            className="mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing p-0.5 -ml-1 rounded hover:bg-white/10 transition-colors touch-none"
+                            title="Drag to move"
+                        >
+                            <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                        </div>
+                    )}
 
                     {/* Checkbox */}
                     {onToggle && (
                         <button
-                            className="mt-0.5 flex-shrink-0"
-                            onClick={(e) => { e.stopPropagation(); onToggle(); }}
+                            className={`mt-0.5 flex-shrink-0 ${readOnly ? 'cursor-default' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); if (!readOnly) onToggle(); }}
                         >
                             {task.status === 'done'
                                 ? <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -928,9 +948,9 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                             </div>
                         ) : (
                             <div
-                                onClick={() => onUpdate && setIsEditing(true)}
+                                onClick={() => !readOnly && onUpdate && setIsEditing(true)}
                                 onPointerDown={(e) => e.stopPropagation()}
-                                className={`text-left text-sm font-medium w-full cursor-text ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+                                className={`text-left text-sm font-medium w-full ${!readOnly ? 'cursor-text' : ''} ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
                             >
                                 <span className="inline">
                                     <SmartText text={task.title} className="inline" />
@@ -984,7 +1004,7 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                     </div>
 
                     {/* Delete - Bigger and more visible */}
-                    {onDelete && (
+                    {onDelete && !readOnly && (
                         <button
                             className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-red-500/0 hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-all"
                             onPointerDown={(e) => e.stopPropagation()}

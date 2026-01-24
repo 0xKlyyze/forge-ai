@@ -16,7 +16,7 @@ export default function Workspace() {
   const navigate = useNavigate();
 
   // Get data from context (shared with other project pages)
-  const { project: contextProject, files: contextFiles, isLoading } = useProjectContext();
+  const { project: contextProject, files: contextFiles, isLoading, readOnly, baseUrl } = useProjectContext();
 
   // Mutation hooks
   const createFileMutation = useCreateFile(projectId);
@@ -83,7 +83,7 @@ export default function Workspace() {
         if (found) {
           setActiveFile(found);
           localStorage.setItem(LAST_FILE_KEY, found.id);
-          navigate(`/project/${projectId}/editor/${found.id}`, { replace: true });
+          navigate(`${baseUrl}/editor/${found.id}`, { replace: true });
         }
       } else {
         // Check localStorage for last opened file
@@ -92,7 +92,7 @@ export default function Workspace() {
           const found = filesData.find(f => f.id === lastFileId);
           if (found) {
             setActiveFile(found);
-            navigate(`/project/${projectId}/editor/${found.id}`, { replace: true });
+            navigate(`${baseUrl}/editor/${found.id}`, { replace: true });
           }
         }
       }
@@ -112,7 +112,7 @@ export default function Workspace() {
       setFiles(prev => [...prev, newFile]);
       setActiveFile(newFile);
       localStorage.setItem(LAST_FILE_KEY, newFile.id);
-      navigate(`/project/${projectId}/editor/${newFile.id}`);
+      navigate(`${baseUrl}/editor/${newFile.id}`);
       toast.success("File created");
     } catch (error) {
       toast.error("Failed to create file");
@@ -128,7 +128,7 @@ export default function Workspace() {
       if (activeFile && activeFile.id === id) {
         setActiveFile(null);
         localStorage.removeItem(LAST_FILE_KEY);
-        navigate(`/project/${projectId}/editor`);
+        navigate(`${baseUrl}/editor`);
       }
     } catch (error) {
       // Error handled by mutation
@@ -174,7 +174,7 @@ export default function Workspace() {
   );
 
   const handleContentChange = (newContent) => {
-    if (!activeFile) return;
+    if (!activeFile || readOnly) return;
 
     const updatedFile = { ...activeFile, content: newContent };
     setActiveFile(updatedFile);
@@ -186,7 +186,7 @@ export default function Workspace() {
     setActiveFile(file);
     // Save to localStorage for session persistence
     localStorage.setItem(LAST_FILE_KEY, file.id);
-    navigate(`/project/${projectId}/editor/${file.id}`);
+    navigate(`${baseUrl}/editor/${file.id}`);
   };
 
   // Handle dropped files (images, etc.)
@@ -259,6 +259,7 @@ export default function Workspace() {
   }, []);
 
   const handleDrop = useCallback((e) => {
+    if (readOnly) return;
     e.preventDefault();
     setIsDragging(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
@@ -298,7 +299,7 @@ export default function Workspace() {
         </div>
         <div className="flex items-center gap-3">
           {/* Format Toggle - only for doc files */}
-          {activeFile?.type === 'doc' && (
+          {activeFile?.type === 'doc' && !readOnly && (
             <div className="flex items-center bg-secondary/30 rounded-lg p-0.5 border border-white/5 transition-all duration-200" title="Switch document format">
               <button
                 onClick={async () => {
@@ -309,8 +310,8 @@ export default function Workspace() {
                   }
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 ${activeFile.name.endsWith('.md')
-                    ? 'bg-primary text-primary-foreground shadow-md scale-[1.02]'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5 hover:scale-[1.02]'
+                  ? 'bg-primary text-primary-foreground shadow-md scale-[1.02]'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5 hover:scale-[1.02]'
                   }`}
               >
                 <FileText className="h-3 w-3 transition-transform duration-200" />
@@ -325,8 +326,8 @@ export default function Workspace() {
                   }
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 ${activeFile.name.endsWith('.xml')
-                    ? 'bg-amber-500/90 text-white shadow-md scale-[1.02]'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5 hover:scale-[1.02]'
+                  ? 'bg-amber-500/90 text-white shadow-md scale-[1.02]'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5 hover:scale-[1.02]'
                   }`}
               >
                 <FileCode className="h-3 w-3 transition-transform duration-200" />
@@ -359,6 +360,7 @@ export default function Workspace() {
               onUpdateFile={handleUpdateFile}
               onUpdateProject={handleUpdateProject}
               onDropFiles={handleDropFiles}
+              readOnly={readOnly}
             />
           </ResizablePanel>
 
@@ -370,6 +372,7 @@ export default function Workspace() {
               <Editor
                 file={activeFile}
                 onChange={handleContentChange}
+                readOnly={readOnly}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground font-mono text-sm bg-[#0a0a0a]">

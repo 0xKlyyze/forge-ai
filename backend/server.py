@@ -3,9 +3,10 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from database import db, get_db, close_mongo_connection
 from contextlib import asynccontextmanager
-from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse, TaskModel, TaskResponse, ChatSessionModel, ChatSessionResponse, ChatSessionListResponse
+from models import UserModel, UserResponse, ProjectModel, ProjectResponse, FileModel, FileResponse, TaskModel, TaskResponse, ChatSessionModel, ChatSessionResponse, ChatSessionListResponse, ShareLinkModel
 from auth import get_password_hash, verify_password, create_access_token, create_refresh_token, verify_refresh_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta, datetime
+import secrets
 from typing import List
 from chat import generate_response, get_available_models, edit_selection, assess_project_potential, format_content_with_lines, apply_insert, apply_replace
 from bson import ObjectId
@@ -166,7 +167,13 @@ async def create_project(project: ProjectModel, current_user: dict = Depends(get
 @app.get("/api/projects", response_model=List[ProjectResponse])
 async def list_projects(current_user: dict = Depends(get_current_user)):
     projects = []
-    cursor = db.projects.find({"user_id": current_user["id"]}).sort("last_edited", -1)
+    # Find projects where user is owner OR collaborator
+    cursor = db.projects.find({
+        "$or": [
+            {"user_id": current_user["id"]},
+            {"collaborators": current_user["id"]}
+        ]
+    }).sort("last_edited", -1)
     async for project in cursor:
         projects.append(ProjectResponse(
             id=str(project["_id"]),
@@ -196,9 +203,33 @@ async def get_project_assessment(project_id: str, current_user: dict = Depends(g
     
 @app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str, current_user: dict = Depends(get_current_user)):
-    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    project = await db.projects.find_one({
+        "_id": ObjectId(project_id),
+        "$or": [
+            {"user_id": current_user["id"]},
+            {"collaborators": current_user["id"]}
+        ]
+    })
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Populate collaborators
+    collab_ids = project.get("collaborators", [])
+    collabs = []
+    if collab_ids:
+        # Convert str IDs to ObjectIds if needed, but they seem to be stored as str in my design? 
+        # In invite acceptance: "$addToSet": {"collaborators": current_user["id"]} -> stored as str.
+        # But wait, User IDs are usually str in responses but ObjectId in DB? 
+        # UserResponse(id=str(created_user["_id"])).
+        # In auth.py: user_id = str(user["_id"]).
+        # So they are stored as strings.
+        # But to query db.users, we need ObjectIds.
+        collab_oids = [ObjectId(uid) for uid in collab_ids if ObjectId.is_valid(uid)]
+        if collab_oids:
+            cursor = db.users.find({"_id": {"$in": collab_oids}})
+            async for u in cursor:
+                collabs.append({"id": str(u["_id"]), "email": u["email"]})
+    
     return ProjectResponse(
         id=str(project["_id"]),
         name=project["name"],
@@ -206,8 +237,10 @@ async def get_project(project_id: str, current_user: dict = Depends(get_current_
         tags=project.get("tags", []),
         links=project.get("links", []),
         icon=project.get("icon", ""),
+        custom_categories=project.get("custom_categories", []),
         created_at=project["created_at"],
-        last_edited=project["last_edited"]
+        last_edited=project["last_edited"],
+        collaborators=collabs
     )
 
 @app.delete("/api/projects/{project_id}")
@@ -217,11 +250,17 @@ async def delete_project(project_id: str, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Project not found")
 @app.put("/api/projects/{project_id}", response_model=ProjectResponse)
 async def update_project(project_id: str, updates: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    existing_project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    existing_project = await db.projects.find_one({
+        "_id": ObjectId(project_id),
+        "$or": [
+            {"user_id": current_user["id"]},
+            {"collaborators": current_user["id"]}
+        ]
+    })
     if not existing_project:
         raise HTTPException(status_code=404, detail="Project not found")
     print(f"DEBUG: update_project {project_id} received updates: {updates}")
-    allowed = ["name", "status", "tags", "links", "icon", "custom_categories"]
+    allowed = ["name", "status", "tags", "links", "icon", "custom_categories", "collaborators"] # Added collaborators
     filtered_updates = {k: v for k, v in updates.items() if k in allowed}
     print(f"DEBUG: update_project {project_id} filtered updates: {filtered_updates}")
     
@@ -256,6 +295,200 @@ async def update_project(project_id: str, updates: dict = Body(...), current_use
     await db.files.delete_many({"project_id": project_id})
     await db.tasks.delete_many({"project_id": project_id})
     return {"detail": "Project deleted"}
+
+# --- SHARING & COLLABORATION ---
+
+@app.post("/api/projects/{project_id}/share")
+async def share_project(project_id: str, permissions: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Generate a public read-only share link"""
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    token = secrets.token_urlsafe(16)
+    share_link = {
+        "project_id": project_id,
+        "created_by": current_user["id"],
+        "token": token,
+        "type": "view",
+        "permissions": permissions, # { 'allow_files': ['id1', 'id2'], 'allow_pages': ['home', 'tasks'] }
+        "status": "active",
+        "created_at": datetime.now(),
+        "views": 0
+    }
+    
+    await db.share_links.insert_one(share_link)
+    return {"token": token, "url": f"/s/{token}"}
+
+@app.get("/api/shared/{token}")
+async def get_shared_project(token: str):
+    """Get project data via share token (Read-Only)"""
+    link = await db.share_links.find_one({"token": token, "status": "active", "type": "view"})
+    if not link:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+        
+    project = await db.projects.find_one({"_id": ObjectId(link["project_id"])})
+    if not project:
+         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Increment view count
+    await db.share_links.update_one({"_id": link["_id"]}, {"$inc": {"views": 1}})
+
+    # Filter data based on permissions
+    # If specific files are allow-listed, only return those.
+    # For now, we return basic project info.
+    
+    return {
+        "project": {
+            "id": str(project["_id"]),
+            "name": project["name"],
+            "icon": project.get("icon", ""),
+            "status": project.get("status", "planning"),
+            "tags": project.get("tags", []),
+            "created_at": project["created_at"],
+        },
+        "permissions": link.get("permissions", {})
+    }
+
+@app.get("/api/shared/{token}/files")
+async def list_shared_files(token: str):
+    """List files allowed by share token"""
+    link = await db.share_links.find_one({"token": token, "status": "active", "type": "view"})
+    if not link:
+        raise HTTPException(status_code=404, detail="Invalid link")
+        
+    permissions = link.get("permissions", {})
+    allowed_files = permissions.get("allow_files", [])
+
+    query = {"project_id": link["project_id"]}
+    if allowed_files:
+        # Convert to ObjectIds
+        ids = [ObjectId(fid) for fid in allowed_files if ObjectId.is_valid(fid)]
+        query["_id"] = {"$in": ids}
+    elif permissions.get("allow_all_files", False):
+        pass # Allow all
+    else:
+        return [] # No files allowed
+        
+    files = []
+    cursor = db.files.find(query).sort("priority", -1)
+    async for f in cursor:
+        files.append(FileResponse(
+            id=str(f["_id"]),
+            project_id=f["project_id"],
+            name=f["name"],
+            type=f["type"],
+            category=f["category"],
+            content=f.get("content", ""),
+            priority=f.get("priority", 5),
+            tags=f.get("tags", []),
+            pinned=f.get("pinned", False),
+            last_edited=f["last_edited"]
+        ))
+    return files
+
+@app.get("/api/shared/{token}/tasks")
+async def list_shared_tasks(token: str):
+    """List tasks allowed by share token"""
+    link = await db.share_links.find_one({"token": token, "status": "active", "type": "view"})
+    if not link:
+        raise HTTPException(status_code=404, detail="Invalid link")
+        
+    permissions = link.get("permissions", {})
+    allow_pages = permissions.get("allow_pages", [])
+    
+    # Check if 'tasks' page is allowed
+    if "tasks" not in allow_pages:
+        raise HTTPException(status_code=403, detail="Tasks access denied")
+        
+    tasks = []
+    cursor = db.tasks.find({"project_id": link["project_id"]}).sort("created_at", -1)
+    async for t in cursor:
+        tasks.append(TaskResponse(
+            id=str(t["_id"]),
+            project_id=t["project_id"],
+            title=t["title"],
+            status=t.get("status", "todo"),
+            priority=t.get("priority", "medium"),
+            importance=t.get("importance", "medium"),
+            difficulty=t.get("difficulty", "medium"),
+            quadrant=t.get("quadrant", "q2"),
+            created_at=t["created_at"],
+            updated_at=t.get("updated_at")
+        ))
+    return tasks
+
+@app.post("/api/projects/{project_id}/invites")
+async def create_invite(project_id: str, body: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Create an invite link/token"""
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    email = body.get("email")
+    
+    token = secrets.token_urlsafe(16)
+    invite = {
+        "project_id": project_id,
+        "created_by": current_user["id"],
+        "token": token,
+        "type": "invite",
+        "target_email": email,
+        "status": "active",
+        "created_at": datetime.now()
+    }
+    
+    await db.share_links.insert_one(invite)
+    
+    if email:
+        # Add to pending invites on project
+        await db.projects.update_one(
+            {"_id": ObjectId(project_id)},
+            {"$addToSet": {"pending_invites": email}}
+        )
+        
+    return {"token": token, "url": f"/invite/{token}"}
+
+@app.post("/api/invites/{token}/accept")
+async def accept_invite(token: str, current_user: dict = Depends(get_current_user)):
+    """Accept an invite token"""
+    invite = await db.share_links.find_one({"token": token, "status": "active", "type": "invite"})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite")
+        
+    project_id = invite["project_id"]
+    
+    # Check if already collaborator
+    project = await db.projects.find_one({"_id": ObjectId(project_id)})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    if current_user["id"] in project.get("collaborators", []):
+         return {"detail": "Already a collaborator", "project_id": project_id}
+         
+    # Add to collaborators
+    await db.projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {
+            "$addToSet": {"collaborators": current_user["id"]},
+            "$pull": {"pending_invites": current_user.get("email")} 
+        }
+    )
+    
+    return {"detail": "Joined project successfully", "project_id": project_id}
+
+@app.delete("/api/projects/{project_id}/collaborators/{user_id}")
+async def remove_collaborator(project_id: str, user_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a collaborator (Owner only)"""
+    project = await db.projects.find_one({"_id": ObjectId(project_id), "user_id": current_user["id"]})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+        
+    await db.projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {"$pull": {"collaborators": user_id}}
+    )
+    return {"detail": "Collaborator removed"}
 
 # --- FILES ---
 @app.get("/api/projects/{project_id}/files", response_model=List[FileResponse])

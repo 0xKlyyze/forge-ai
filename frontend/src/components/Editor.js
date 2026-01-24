@@ -91,7 +91,7 @@ const getLanguageFromFilename = (filename) => {
   return languageMap[ext] || 'plaintext';
 };
 
-export default function FileEditor({ file, onChange, onAddToChat }) {
+export default function FileEditor({ file, onChange, onAddToChat, readOnly }) {
   const language = getLanguageFromFilename(file.name);
 
   const editorRef = useRef(null);
@@ -117,6 +117,7 @@ export default function FileEditor({ file, onChange, onAddToChat }) {
     // Listen for selection changes
     // Wrapped in try/catch to prevent crashes on mobile devices during rapid text operations
     editor.onDidChangeCursorSelection((e) => {
+      if (readOnly) return;
       try {
         const selection = editor.getSelection();
         const model = editor.getModel();
@@ -339,7 +340,9 @@ export default function FileEditor({ file, onChange, onAddToChat }) {
             padding: { top: 16 },
             fontFamily: 'JetBrains Mono, monospace',
             scrollBeyondLastLine: false,
-            smoothScrolling: true
+            scrollBeyondLastLine: false,
+            smoothScrolling: true,
+            readOnly: readOnly
           }}
         />
       </EditorErrorBoundary>

@@ -26,10 +26,24 @@ class UserModel(BaseModel):
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.now)
 
+class ShareLinkModel(BaseModel):
+    id: Optional[str] = Field(default=None, alias="_id")
+    project_id: str
+    created_by: str  # User ID
+    token: str
+    type: str = "view"  # 'view' or 'invite'
+    permissions: dict = {}  # {'allow_files': [], 'allow_pages': ['home', 'tasks']}
+    status: str = "active"
+    created_at: datetime = Field(default_factory=datetime.now)
+    expires_at: Optional[datetime] = None
+    views: int = 0
+
 class ProjectModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     name: str
-    user_id: str
+    user_id: Optional[str] = None
+    collaborators: List[str] = [] # List of User IDs
+    pending_invites: List[str] = [] # List of emails
     status: str = "planning" 
     tags: List[str] = []
     created_at: datetime = Field(default_factory=datetime.now)
@@ -80,6 +94,7 @@ class ProjectResponse(BaseModel):
     custom_categories: List[dict] = []
     created_at: datetime
     last_edited: datetime
+    collaborators: List[dict] = []
 
 class FileResponse(BaseModel):
     id: str

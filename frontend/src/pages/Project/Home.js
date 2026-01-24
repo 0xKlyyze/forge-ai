@@ -23,7 +23,7 @@ export default function ProjectHome() {
     const navigate = useNavigate();
 
     // Use shared context data instead of fetching
-    const { project, tasks, files, dashboard, isLoading } = useProjectContext();
+    const { project, tasks, files, dashboard, isLoading, readOnly, baseUrl } = useProjectContext();
     const updateTaskMutation = useUpdateTask(projectId);
     const createTaskMutation = useCreateTask(projectId);
     const createFileMutation = useCreateFile(projectId);
@@ -70,6 +70,7 @@ export default function ProjectHome() {
 
     const handleAiSend = async (e) => {
         e.preventDefault();
+        if (readOnly) return;
         if (!aiMessage.trim() || aiLoading) return;
         setAiLoading(true);
         try {
@@ -78,7 +79,7 @@ export default function ProjectHome() {
                 message: aiMessage, context_mode: 'selective', referenced_files: [], web_search: false, model_preset: 'fast'
             });
             toast.success("Opening chat...");
-            navigate(`/project/${projectId}/chat?session=${sessionRes.data.id}`);
+            navigate(`${baseUrl}/chat?session=${sessionRes.data.id}`);
         } catch (error) { toast.error("Failed to send message"); }
         finally { setAiLoading(false); }
     };
@@ -109,6 +110,7 @@ export default function ProjectHome() {
 
     // Shortcut Listeners
     useEffect(() => {
+        if (readOnly) return;
         const onOpenTask = () => setTaskDialogOpen(true);
         const onOpenDoc = () => setDocDialogOpen(true);
         const onUpload = () => document.getElementById('quick-up')?.click();
@@ -231,9 +233,9 @@ export default function ProjectHome() {
                                     <Input
                                         value={aiMessage}
                                         onChange={(e) => setAiMessage(e.target.value)}
-                                        placeholder="Ask anything about your project... (Alt+Shift+A)"
+                                        placeholder={readOnly ? "Chat disabled in read-only mode" : "Ask anything about your project... (Alt+Shift+A)"}
                                         className="h-12 pl-4 pr-14 text-sm bg-background/50 border-white/10 rounded-2xl focus-visible:ring-primary/50"
-                                        disabled={aiLoading}
+                                        disabled={aiLoading || readOnly}
                                     />
                                     <Button
                                         type="submit"
@@ -249,8 +251,9 @@ export default function ProjectHome() {
                                     {['Help me plan', 'Review my code', 'Explain architecture'].map((suggestion) => (
                                         <button
                                             key={suggestion}
-                                            onClick={() => setAiMessage(suggestion)}
-                                            className="px-3 py-1.5 text-xs bg-white/5 hover:bg-primary/10 border border-white/10 hover:border-primary/30 rounded-xl text-muted-foreground hover:text-foreground transition-all"
+                                            onClick={() => !readOnly && setAiMessage(suggestion)}
+                                            disabled={readOnly}
+                                            className={`px-3 py-1.5 text-xs rounded-xl border transition-all ${readOnly ? 'opacity-50 cursor-not-allowed bg-white/5 border-white/5' : 'bg-white/5 hover:bg-primary/10 border-white/10 hover:border-primary/30 text-muted-foreground hover:text-foreground'}`}
                                         >
                                             {suggestion}
                                         </button>
@@ -311,25 +314,29 @@ export default function ProjectHome() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button size="sm" variant="ghost" className="rounded-xl border border-white/10" onClick={() => navigate(`/project/${projectId}/tasks`)}>
+                                    <Button size="sm" variant="ghost" className="rounded-xl border border-white/10" onClick={() => navigate(`${baseUrl}/tasks`)}>
                                         View
                                     </Button>
-                                    <Button size="sm" className="rounded-xl" onClick={async () => {
-                                        await api.put(`/tasks/${stats.nextTask.id}`, { status: 'done' });
-                                        toast.success("🎉 Complete!");
-                                        loadData();
-                                    }}>
-                                        <CheckCircle2 className="h-4 w-4 mr-1" /> Done
-                                    </Button>
+                                    {!readOnly && (
+                                        <Button size="sm" className="rounded-xl" onClick={async () => {
+                                            await api.put(`/tasks/${stats.nextTask.id}`, { status: 'done' });
+                                            toast.success("🎉 Complete!");
+                                            loadData();
+                                        }}>
+                                            <CheckCircle2 className="h-4 w-4 mr-1" /> Done
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         ) : (
                             <div className="rounded-2xl bg-secondary/20 border border-white/5 p-4 flex items-center justify-center gap-3">
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
                                 <span className="text-sm text-muted-foreground">All caught up! No active focus.</span>
-                                <Button size="sm" variant="outline" className="ml-4 rounded-xl" onClick={() => setTaskDialogOpen(true)}>
-                                    New Task
-                                </Button>
+                                {!readOnly && (
+                                    <Button size="sm" variant="outline" className="ml-4 rounded-xl" onClick={() => setTaskDialogOpen(true)}>
+                                        New Task
+                                    </Button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -373,8 +380,8 @@ export default function ProjectHome() {
                                         {priorityTasks.map((task) => (
                                             <div key={task.id} className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all">
                                                 <button
-                                                    onClick={() => handleQuickComplete(task.id)}
-                                                    className="h-4 w-4 rounded-full border-2 border-muted-foreground/50 hover:border-green-500 hover:bg-green-500/20 transition-all flex-shrink-0"
+                                                    onClick={() => !readOnly && handleQuickComplete(task.id)}
+                                                    className={`h-4 w-4 rounded-full border-2 transition-all flex-shrink-0 ${readOnly ? 'border-muted-foreground/30' : 'border-muted-foreground/50 hover:border-green-500 hover:bg-green-500/20'}`}
                                                 />
                                                 <span className="text-sm truncate flex-1">{task.title}</span>
                                             </div>
@@ -396,7 +403,7 @@ export default function ProjectHome() {
                             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <MessageSquare className="h-4 w-4 text-primary" />
                                 Recent Chats
-                                <button onClick={() => navigate(`/project/${projectId}/chat`)} className="ml-auto text-[10px] text-primary hover:underline flex items-center gap-1">
+                                <button onClick={() => navigate(`${baseUrl}/chat`)} className="ml-auto text-[10px] text-primary hover:underline flex items-center gap-1">
                                     All <ArrowRight className="h-3 w-3" />
                                 </button>
                             </CardTitle>
@@ -408,7 +415,7 @@ export default function ProjectHome() {
                                         {recentChats.map((chat) => (
                                             <button
                                                 key={chat.id}
-                                                onClick={() => navigate(`/project/${projectId}/chat?session=${chat.id}`)}
+                                                onClick={() => navigate(`${baseUrl}/chat?session=${chat.id}`)}
                                                 className="w-full group flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all text-left"
                                             >
                                                 <div className="h-7 w-7 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -446,8 +453,8 @@ export default function ProjectHome() {
                                         <button
                                             key={i}
                                             onClick={() => {
-                                                if (act.type === 'file') navigate(`/project/${projectId}/editor/${act.item.id}`);
-                                                else if (act.type === 'task') navigate(`/project/${projectId}/tasks`);
+                                                if (act.type === 'file') navigate(`${baseUrl}/editor/${act.item.id}`);
+                                                else if (act.type === 'task') navigate(`${baseUrl}/tasks`);
                                             }}
                                             className="w-full text-left flex items-center gap-3 py-2 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded-lg transition-colors group"
                                         >
@@ -470,7 +477,7 @@ export default function ProjectHome() {
                         <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                             <Star className="h-4 w-4 text-yellow-500" />
                             Pinned Artifacts
-                            <button onClick={() => navigate(`/project/${projectId}/files`)} className="ml-auto text-[10px] text-primary hover:underline flex items-center gap-1">
+                            <button onClick={() => navigate(`${baseUrl}/files`)} className="ml-auto text-[10px] text-primary hover:underline flex items-center gap-1">
                                 All Files <ArrowRight className="h-3 w-3" />
                             </button>
                         </CardTitle>
@@ -504,61 +511,63 @@ export default function ProjectHome() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════════
-          FLOATING ACTION BAR
-      ═══════════════════════════════════════════════════════════════════ */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-                <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl">
-                    <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4">
-                                <CheckCircle2 className="h-4 w-4 mr-2" /> Task <span className="ml-2 text-[10px] opacity-50 font-mono">N</span>
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader><DialogTitle>New Task</DialogTitle></DialogHeader>
-                            <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
-                                <Input placeholder="What needs to be done?" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} autoFocus required />
-                                <Button type="submit" className="w-full">Create Task</Button>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+            FLOATING ACTION BAR
+        ═══════════════════════════════════════════════════════════════════ */}
+            {!readOnly && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+                    <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl">
+                        <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4">
+                                    <CheckCircle2 className="h-4 w-4 mr-2" /> Task <span className="ml-2 text-[10px] opacity-50 font-mono">N</span>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader><DialogTitle>New Task</DialogTitle></DialogHeader>
+                                <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
+                                    <Input placeholder="What needs to be done?" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} autoFocus required />
+                                    <Button type="submit" className="w-full">Create Task</Button>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
 
-                    <div className="w-px h-6 bg-white/10" />
+                        <div className="w-px h-6 bg-white/10" />
 
-                    <Dialog open={docDialogOpen} onOpenChange={setDocDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4">
-                                <FileText className="h-4 w-4 mr-2" /> Doc <span className="ml-2 text-[10px] opacity-50 font-mono">D</span>
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader><DialogTitle>New Document</DialogTitle></DialogHeader>
-                            <Tabs defaultValue="create" className="w-full pt-2">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="create">Create</TabsTrigger>
-                                    <TabsTrigger value="upload">Upload</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="create">
-                                    <form onSubmit={handleCreateDoc} className="space-y-4 pt-4">
-                                        <Input placeholder="document-name.md" value={newDocName} onChange={e => setNewDocName(e.target.value)} autoFocus required />
-                                        <Button type="submit" className="w-full">Create</Button>
-                                    </form>
-                                </TabsContent>
-                                <TabsContent value="upload" className="pt-4">
-                                    <Input type="file" onChange={handleUpload} />
-                                </TabsContent>
-                            </Tabs>
-                        </DialogContent>
-                    </Dialog>
+                        <Dialog open={docDialogOpen} onOpenChange={setDocDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4">
+                                    <FileText className="h-4 w-4 mr-2" /> Doc <span className="ml-2 text-[10px] opacity-50 font-mono">D</span>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader><DialogTitle>New Document</DialogTitle></DialogHeader>
+                                <Tabs defaultValue="create" className="w-full pt-2">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="create">Create</TabsTrigger>
+                                        <TabsTrigger value="upload">Upload</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="create">
+                                        <form onSubmit={handleCreateDoc} className="space-y-4 pt-4">
+                                            <Input placeholder="document-name.md" value={newDocName} onChange={e => setNewDocName(e.target.value)} autoFocus required />
+                                            <Button type="submit" className="w-full">Create</Button>
+                                        </form>
+                                    </TabsContent>
+                                    <TabsContent value="upload" className="pt-4">
+                                        <Input type="file" onChange={handleUpload} />
+                                    </TabsContent>
+                                </Tabs>
+                            </DialogContent>
+                        </Dialog>
 
-                    <div className="w-px h-6 bg-white/10" />
+                        <div className="w-px h-6 bg-white/10" />
 
-                    <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4" onClick={() => document.getElementById('quick-up')?.click()}>
-                        <Upload className="h-4 w-4 mr-2" /> Upload <span className="ml-2 text-[10px] opacity-50 font-mono">U</span>
-                    </Button>
-                    <input id="quick-up" type="file" className="hidden" onChange={handleUpload} />
+                        <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/10 px-4" onClick={() => document.getElementById('quick-up')?.click()}>
+                            <Upload className="h-4 w-4 mr-2" /> Upload <span className="ml-2 text-[10px] opacity-50 font-mono">U</span>
+                        </Button>
+                        <input id="quick-up" type="file" className="hidden" onChange={handleUpload} />
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Preview Modal for Pinned Items */}
             <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
@@ -580,7 +589,10 @@ export default function ProjectHome() {
                         <Button variant="secondary" className="rounded-xl" onClick={() => handleDownload(previewFile)}>
                             <Download className="h-4 w-4 mr-2" /> Download
                         </Button>
-                        <Button className="rounded-xl" onClick={() => { setPreviewFile(null); navigate(`/project/${projectId}/editor/${previewFile.id}`); }}>
+                        <Button variant="secondary" className="rounded-xl" onClick={() => handleDownload(previewFile)}>
+                            <Download className="h-4 w-4 mr-2" /> Download
+                        </Button>
+                        <Button className="rounded-xl" onClick={() => { setPreviewFile(null); navigate(`${baseUrl}/editor/${previewFile.id}`); }}>
                             <ExternalLink className="h-4 w-4 mr-2" /> Open Editor
                         </Button>
                     </div>

@@ -9,18 +9,22 @@ const ProjectContext = createContext(null);
  * Data is fetched once at the layout level and shared with all child pages,
  * eliminating duplicate requests when navigating between Home, Tasks, Files, etc.
  */
-export function ProjectProvider({ projectId, children }) {
-    const projectQuery = useProject(projectId);
-    const tasksQuery = useProjectTasks(projectId);
-    const filesQuery = useProjectFiles(projectId);
+export function ProjectProvider({ projectId, token, children }) {
+    const projectQuery = useProject(projectId, token);
+    const tasksQuery = useProjectTasks(projectId, token);
+    const filesQuery = useProjectFiles(projectId, token);
     const dashboardQuery = useProjectDashboard(projectId);
 
     const value = useMemo(() => ({
         // Data
         project: projectQuery.data,
+        readOnly: !!token,
         tasks: tasksQuery.data || [],
         files: filesQuery.data || [],
         dashboard: dashboardQuery.data,
+        projectId,
+        token,
+        baseUrl: token ? `/s/${token}` : `/project/${projectId}`,
 
         // Loading states
         isLoading: projectQuery.isLoading,
@@ -40,6 +44,7 @@ export function ProjectProvider({ projectId, children }) {
         tasksQuery.data, tasksQuery.isLoading, tasksQuery.refetch,
         filesQuery.data, filesQuery.isLoading, filesQuery.refetch,
         dashboardQuery.data, dashboardQuery.isLoading, dashboardQuery.refetch,
+        token
     ]);
 
     return (

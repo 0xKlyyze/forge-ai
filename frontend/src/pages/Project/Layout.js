@@ -6,7 +6,9 @@ import {
     Settings,
     Code,
     Sparkles,
-    LogOut
+
+    LogOut,
+    LogIn
 } from 'lucide-react';
 import { Outlet, useNavigate, useParams, NavLink } from 'react-router-dom';
 import ColorThief from 'colorthief';
@@ -26,20 +28,21 @@ const MainNavLink = ({ to, label, icon: Icon }) => (
     </NavLink>
 );
 
-export default function ProjectLayout() {
-    const { projectId } = useParams();
+export default function ProjectLayout({ projectId: propProjectId, token: propToken, readOnly: propReadOnly }) {
+    const params = useParams();
+    const projectId = propProjectId || params.projectId;
 
     return (
-        <ProjectProvider projectId={projectId}>
+        <ProjectProvider projectId={projectId} token={propToken}>
             <ProjectLayoutContent />
         </ProjectProvider>
     );
 }
 
 function ProjectLayoutContent() {
-    const { projectId } = useParams();
     const navigate = useNavigate();
-    const { project } = useProjectContext();
+    const { project, readOnly, projectId, token } = useProjectContext();
+    const baseUrl = token ? `/s/${token}` : `/project/${projectId}`;
     const containerRef = useRef(null);
 
     // Apply default gradient on mount
@@ -116,6 +119,8 @@ function ProjectLayoutContent() {
             if (activeEl.closest('.monaco-editor')) return;
             if (e.metaKey || e.ctrlKey || e.altKey) return; // Avoid conflict with browser shortcuts
 
+            if (readOnly) return; // Disable shortcuts in read-only mode
+
             switch (e.key.toLowerCase()) {
                 // Quick Actions
                 case 'n':
@@ -134,11 +139,11 @@ function ProjectLayoutContent() {
                     break;
 
                 // Navigation
-                case '1': e.preventDefault(); navigate(`/project/${projectId}/home`); break;
-                case '2': e.preventDefault(); navigate(`/project/${projectId}/chat`); break;
-                case '3': e.preventDefault(); navigate(`/project/${projectId}/files`); break;
-                case '4': e.preventDefault(); navigate(`/project/${projectId}/editor`); break;
-                case '5': e.preventDefault(); navigate(`/project/${projectId}/tasks`); break;
+                case '1': e.preventDefault(); navigate(`${baseUrl}/home`); break;
+                case '2': e.preventDefault(); navigate(`${baseUrl}/chat`); break;
+                case '3': e.preventDefault(); navigate(`${baseUrl}/files`); break;
+                case '4': e.preventDefault(); navigate(`${baseUrl}/editor`); break;
+                case '5': e.preventDefault(); navigate(`${baseUrl}/tasks`); break;
             }
         };
 
@@ -147,12 +152,12 @@ function ProjectLayoutContent() {
     }, [projectId, navigate]);
 
     const mainNavItems = [
-        { to: `/project/${projectId}/home`, label: 'Home', icon: Home },
-        { to: `/project/${projectId}/chat`, label: 'Advisor', icon: Sparkles },
-        { to: `/project/${projectId}/tasks`, label: 'Tasks', icon: CheckSquare },
-        { to: `/project/${projectId}/files`, label: 'Artifacts', icon: FileText },
-        { to: `/project/${projectId}/editor`, label: 'Editor', icon: Code },
-    ];
+        { to: `${baseUrl}/home`, label: 'Home', icon: Home },
+        { to: `${baseUrl}/chat`, label: 'Advisor', icon: Sparkles },
+        { to: `${baseUrl}/tasks`, label: 'Tasks', icon: CheckSquare },
+        { to: `${baseUrl}/files`, label: 'Artifacts', icon: FileText },
+        { to: `${baseUrl}/editor`, label: 'Editor', icon: Code },
+    ].filter(Boolean);
 
     return (
         <div ref={containerRef} className="h-screen w-screen bg-background flex antialiased overflow-hidden relative transition-colors duration-700">
@@ -173,25 +178,38 @@ function ProjectLayoutContent() {
 
                 {/* Utilities - at absolute bottom */}
                 <div className="flex flex-col items-center gap-3">
-                    <NavLink
-                        to={`/project/${projectId}/settings`}
-                        title="Settings"
-                        className={({ isActive }) => `
+                    {!readOnly && (
+                        <NavLink
+                            to={`${baseUrl}/settings`}
+                            title="Settings"
+                            className={({ isActive }) => `
                         p-3 rounded-xl transition-all duration-200
                         ${isActive
-                                ? 'bg-primary/20 text-primary shadow-sm'
-                                : 'bg-secondary/30 border border-border/50 text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30'}
+                                    ? 'bg-primary/20 text-primary shadow-sm'
+                                    : 'bg-secondary/30 border border-border/50 text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30'}
                     `}
-                    >
-                        <Settings size={20} />
-                    </NavLink>
-                    <button
-                        onClick={() => navigate('/dashboard')}
-                        className="p-3 text-muted-foreground hover:text-destructive transition-colors"
-                        title="Exit Project"
-                    >
-                        <LogOut size={20} />
-                    </button>
+                        >
+                            <Settings size={20} />
+                        </NavLink>
+                    )}
+
+                    {readOnly ? (
+                        <button
+                            onClick={() => window.location.href = '/login'}
+                            className="flex items-center gap-2 p-3 text-muted-foreground hover:text-primary transition-colors text-xs"
+                            title="Login"
+                        >
+                            <LogIn size={18} />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            className="p-3 text-muted-foreground hover:text-destructive transition-colors"
+                            title="Exit Project"
+                        >
+                            <LogOut size={20} />
+                        </button>
+                    )}
                 </div>
             </nav>
 
@@ -208,6 +226,36 @@ function ProjectLayoutContent() {
 
                     {/* Subtle ambient fill - kept low */}
                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5 pointer-events-none z-0" />
+
+                    {/* Floating CTA Banner for Read-Only Users */}
+                    {readOnly && (
+                        <div className="relative z-20 mx-4 mt-4">
+                            <div className="bg-gradient-to-r from-primary/20 via-primary/15 to-accent/10 backdrop-blur-xl border border-primary/30 rounded-2xl px-6 py-3 flex items-center justify-between shadow-lg shadow-primary/10 relative overflow-hidden group">
+                                {/* Animated shimmer effect */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
+
+                                {/* Left side - Message */}
+                                <div className="flex items-center gap-4 relative z-10">
+                                    <div className="h-10 w-10 rounded-xl bg-primary/30 flex items-center justify-center border border-primary/40 flex-shrink-0">
+                                        <Sparkles className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-white">Start Building with Forge AI for Free</h3>
+                                        <p className="text-xs text-white/60">Create mockups, manage tasks, and generate documents with AI</p>
+                                    </div>
+                                </div>
+
+                                {/* Right side - CTA Button */}
+                                <button
+                                    onClick={() => window.location.href = '/register'}
+                                    className="relative z-10 flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-all font-bold text-sm shadow-md shadow-primary/25 hover:shadow-lg hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] flex-shrink-0"
+                                >
+                                    Create Free Account
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex-1 overflow-y-auto relative z-10">
                         <Outlet />

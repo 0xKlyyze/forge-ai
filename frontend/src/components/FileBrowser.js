@@ -57,7 +57,8 @@ export default function FileBrowser({
   onDelete,
   onUpdateFile,
   onUpdateProject,
-  onDropFiles
+  onDropFiles,
+  readOnly
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -256,95 +257,99 @@ export default function FileBrowser({
         <span className="font-mono text-xs font-bold text-muted-foreground">EXPLORER</span>
         <div className="flex items-center gap-1">
           {/* Create Category */}
-          <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6" title="New Category" disabled={!project}>
-                <FolderPlus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-background/80 backdrop-blur-xl border-white/10">
-              <DialogHeader>
-                <DialogTitle>New Category</DialogTitle>
-                <DialogDescription>Create a new category to organize your files.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateCategory} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category Name</label>
-                  <Input
-                    value={newCategoryName}
-                    onChange={e => setNewCategoryName(e.target.value)}
-                    placeholder="e.g., Utilities"
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="submit">Create</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {!readOnly && (
+            <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" title="New Category" disabled={!project}>
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-background/80 backdrop-blur-xl border-white/10">
+                <DialogHeader>
+                  <DialogTitle>New Category</DialogTitle>
+                  <DialogDescription>Create a new category to organize your files.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateCategory} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Category Name</label>
+                    <Input
+                      value={newCategoryName}
+                      onChange={e => setNewCategoryName(e.target.value)}
+                      placeholder="e.g., Utilities"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit">Create</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
 
           {/* Create File */}
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6" title="New File">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-background/80 backdrop-blur-xl border-white/10">
-              <DialogHeader>
-                <DialogTitle>New File</DialogTitle>
-                <DialogDescription>
-                  Files are auto-categorized by extension (.jsx → UI Components, .md → Documentation)
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateSubmit} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Filename</label>
-                  <Input
-                    value={newFileName}
-                    onChange={e => handleFilenameChange(e.target.value)}
-                    placeholder="e.g., Header.jsx or README.md"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select value={newFileCategory} onValueChange={setNewFileCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allCategories.map(c => (
-                        <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Auto-detected from extension, but you can change it.
-                  </p>
-                </div>
-                <DialogFooter className="flex-col sm:flex-row gap-2">
-                  <label className="flex-1">
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".jsx,.js,.tsx,.ts,.md,.txt,.png,.jpg,.jpeg,.gif,.svg,.webp"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && onDropFiles) {
-                          onDropFiles([file]);
-                          setIsDialogOpen(false);
-                        }
-                      }}
+          {!readOnly && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" title="New File">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-background/80 backdrop-blur-xl border-white/10">
+                <DialogHeader>
+                  <DialogTitle>New File</DialogTitle>
+                  <DialogDescription>
+                    Files are auto-categorized by extension (.jsx → UI Components, .md → Documentation)
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateSubmit} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Filename</label>
+                    <Input
+                      value={newFileName}
+                      onChange={e => handleFilenameChange(e.target.value)}
+                      placeholder="e.g., Header.jsx or README.md"
                     />
-                    <Button type="button" variant="outline" className="w-full" asChild>
-                      <span>Upload File</span>
-                    </Button>
-                  </label>
-                  <Button type="submit">Create Empty</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <Select value={newFileCategory} onValueChange={setNewFileCategory}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allCategories.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-detected from extension, but you can change it.
+                    </p>
+                  </div>
+                  <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".jsx,.js,.tsx,.ts,.md,.txt,.png,.jpg,.jpeg,.gif,.svg,.webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && onDropFiles) {
+                            onDropFiles([file]);
+                            setIsDialogOpen(false);
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" className="w-full" asChild>
+                        <span>Upload File</span>
+                      </Button>
+                    </label>
+                    <Button type="submit">Create Empty</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -400,7 +405,7 @@ export default function FileBrowser({
                         )}
 
                         {/* Quick actions */}
-                        {!renamingFileId && (
+                        {!renamingFileId && !readOnly && (
                           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                             {/* Rename */}
                             <Button

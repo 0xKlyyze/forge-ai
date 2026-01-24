@@ -48,27 +48,33 @@ export function useDashboard() {
 // PROJECT QUERIES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function useProject(projectId) {
+export function useProject(projectId, token = null) {
     return useQuery({
-        queryKey: projectKeys.detail(projectId),
-        queryFn: () => api.get(`/projects/${projectId}`).then(res => res.data),
-        enabled: !!projectId,
+        queryKey: token ? ['shared', token] : projectKeys.detail(projectId),
+        queryFn: () => token
+            ? api.get(`/shared/${token}`).then(res => res.data.project)
+            : api.get(`/projects/${projectId}`).then(res => res.data),
+        enabled: !!projectId || !!token,
     });
 }
 
-export function useProjectFiles(projectId) {
+export function useProjectFiles(projectId, token = null) {
     return useQuery({
-        queryKey: projectKeys.files(projectId),
-        queryFn: () => api.get(`/projects/${projectId}/files`).then(res => res.data),
-        enabled: !!projectId,
+        queryKey: token ? ['shared', token, 'files'] : projectKeys.files(projectId),
+        queryFn: () => token
+            ? api.get(`/shared/${token}/files`).then(res => res.data)
+            : api.get(`/projects/${projectId}/files`).then(res => res.data),
+        enabled: !!projectId || !!token,
     });
 }
 
-export function useProjectTasks(projectId) {
+export function useProjectTasks(projectId, token = null) {
     return useQuery({
-        queryKey: projectKeys.tasks(projectId),
-        queryFn: () => api.get(`/projects/${projectId}/tasks`).then(res => res.data),
-        enabled: !!projectId,
+        queryKey: token ? ['shared', token, 'tasks'] : projectKeys.tasks(projectId),
+        queryFn: () => token
+            ? api.get(`/shared/${token}/tasks`).then(res => res.data)
+            : api.get(`/projects/${projectId}/tasks`).then(res => res.data),
+        enabled: !!projectId || !!token,
     });
 }
 
