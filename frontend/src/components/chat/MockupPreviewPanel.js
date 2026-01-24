@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, Component } from 'react';
 import {
     X, Code, Eye, Check, Loader2, ExternalLink, Sparkles, Maximize2, Minimize2,
-    GitCompare, Monitor, Tablet, Smartphone, Minus, Plus, RotateCcw
+    GitCompare, Monitor, Tablet, Smartphone, Minus, Plus, RotateCcw, Clock
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
@@ -107,7 +107,8 @@ export function MockupPreviewPanel({
     onOpenInEditor,             // Open in full editor
     onClose,
     isSaving = false,
-    isAccepted = false          // Changes already applied
+    isAccepted = false,         // Changes already applied
+    onOpenLatest = null         // Switch to latest version
 }) {
     const [viewMode, setViewMode] = useState('preview'); // 'preview' | 'code'
     const [zoom, setZoom] = useState(100);
@@ -303,6 +304,24 @@ export function MockupPreviewPanel({
                     </button>
                 </div>
             </div>
+
+            {/* History Warning Banner */}
+            {file.id === 'history' && (
+                <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-200/90 text-[11px] font-medium animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-3 w-3 text-amber-400" />
+                        <span>Viewing historical version. Edits won't be saved to the database.</span>
+                    </div>
+                    {onOpenLatest && (
+                        <button
+                            onClick={onOpenLatest}
+                            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 transition-colors"
+                        >
+                            Open Latest Version
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Preview Toolbar (only in preview mode) */}
             {viewMode === 'preview' && !isDiffMode && (

@@ -2158,45 +2158,33 @@ export default function ProjectChat() {
                                 // Skip persisted tool outputs (they are for rehydration only)
                                 if (msg.role === 'tool') return null;
 
-                                // Logic for EditedDocumentCard state
-                                let editedFileWithStatus = editedFilesMap[i];
-
-                                if (editedFileWithStatus) {
+                                // Helper to check if an edit is stale or already accepted
+                                const getEditStatus = (editItem) => {
+                                    if (!editItem) return null;
                                     let isStale = false;
                                     let isAccepted = false;
-                                    const chatFile = editedFileWithStatus;
 
-                                    // Check against current file context if available
-                                    const currentFile = files.find(f => f.id === chatFile.file.id);
-                                    // Get modified content from diffData or direct property (for rehydrated cards)
-                                    const modifiedContent = chatFile.diffData?.modified_content || chatFile.modifiedContent;
-                                    const originalContentForCheck = chatFile.diffData?.original_content || chatFile.originalContent;
+                                    // Try to find by ID first, then by name (crucial for history items)
+                                    const currentFile = files.find(f => f.id === editItem.file.id) ||
+                                        files.find(f => f.name === editItem.file.name);
+
+                                    const modifiedContent = editItem.diffData?.modified_content || editItem.modifiedContent;
+                                    const originalContentForCheck = editItem.diffData?.original_content || editItem.originalContent;
 
                                     if (currentFile && modifiedContent) {
-                                        // Clean strings for comparison (normalize newlines)
                                         const normalize = (str) => (str || '').replace(/\r\n/g, '\n').trim();
                                         const current = normalize(currentFile.content);
                                         const modified = normalize(modifiedContent);
                                         const original = normalize(originalContentForCheck);
 
-                                        // Accepted if current matches modified
-                                        if (current === modified) {
-                                            isAccepted = true;
-                                        }
-                                        // Stale if current matches neither original nor modified
-                                        // (i.e., user edited it manually after AI proposed changes)
-                                        else if (current !== original) {
-                                            isStale = true;
-                                        }
+                                        if (current === modified) isAccepted = true;
+                                        else if (current !== original) isStale = true;
                                     }
+                                    return { ...editItem, isStale, isAccepted };
+                                };
 
-                                    // Enhance the object with status
-                                    editedFileWithStatus = {
-                                        ...chatFile,
-                                        isStale,
-                                        isAccepted
-                                    };
-                                }
+                                const editedFileWithStatus = getEditStatus(editedFilesMap[i]);
+                                const editedMockupWithStatus = getEditStatus(editedMockupsMap[i]);
 
                                 return (
                                     <MessageBubble
@@ -2209,7 +2197,7 @@ export default function ProjectChat() {
                                         createdFile={createdFilesMap[i]}
                                         editedFile={editedFileWithStatus}
                                         createdMockup={createdMockupsMap[i]}
-                                        editedMockup={editedMockupsMap[i]}
+                                        editedMockup={editedMockupWithStatus}
                                         onOpenAgentFile={() => {
                                             const fileForMessage = createdFilesMap[i];
                                             if (fileForMessage) {
@@ -2666,6 +2654,16 @@ export default function ProjectChat() {
                         isSaving={isSavingFile}
                         onAddToChat={handleAddToChat}
                         isAccepted={isDiffAccepted}
+                        onOpenLatest={() => {
+                            const latest = files.find(f => f.name === agentFile.name);
+                            if (latest) {
+                                setAgentFile(latest);
+                                setIsDiffMode(false);
+                                toast.info(`Switched to latest version of ${latest.name}`);
+                            } else {
+                                toast.error("Latest version NOT found in project");
+                            }
+                        }}
                     />
                 </div>
             )}
@@ -2695,6 +2693,16 @@ export default function ProjectChat() {
                         onClose={handleCloseMockupPanel}
                         isSaving={false}
                         isAccepted={isMockupDiffAccepted}
+                        onOpenLatest={() => {
+                            const latest = files.find(f => f.name === mockupPanelFile.name);
+                            if (latest) {
+                                setMockupPanelFile(latest);
+                                setIsMockupDiffMode(false);
+                                toast.info(`Switched to latest version of ${latest.name}`);
+                            } else {
+                                toast.error("Latest version NOT found in project");
+                            }
+                        }}
                     />
                 </div>
             )}

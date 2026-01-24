@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, Component } from 'react';
-import { X, FileText, Check, Loader2, ExternalLink, Sparkles, Maximize2, FileEdit, GitCompare, Palette, Eye } from 'lucide-react';
+import { X, FileText, Check, Loader2, ExternalLink, Sparkles, Maximize2, FileEdit, GitCompare, Palette, Eye, Clock } from 'lucide-react';
 import { Button } from '../ui/button';
 import FileEditor from '../Editor';
 import { DiffEditor } from '@monaco-editor/react';
@@ -58,7 +58,8 @@ export function AgentEditorPanel({
     onClose,
     isSaving = false,
     onAddToChat = null, // Function to add selected text to chat
-    isAccepted = false // Indicates changes were already applied
+    isAccepted = false, // Indicates changes were already applied
+    onOpenLatest = null // Switch to latest version
 }) {
     // Ref to track the DiffEditor instance for proper cleanup
     const diffEditorRef = useRef(null);
@@ -239,6 +240,24 @@ export function AgentEditorPanel({
                     </button>
                 </div>
             </div>
+
+            {/* History Warning Banner */}
+            {file.id === 'history' && (
+                <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-200/90 text-[11px] font-medium animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-3 w-3 text-amber-400" />
+                        <span>Viewing historical version. Edits won't be saved to the database.</span>
+                    </div>
+                    {onOpenLatest && (
+                        <button
+                            onClick={onOpenLatest}
+                            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 transition-colors"
+                        >
+                            Open Latest Version
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Editor - Normal or Diff mode */}
             <div className="flex-1 overflow-hidden">
