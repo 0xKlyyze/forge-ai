@@ -514,7 +514,7 @@ export default function ProjectHome() {
             FLOATING ACTION BAR
         ═══════════════════════════════════════════════════════════════════ */}
             {!readOnly && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+                <div className="hidden md:block fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
                     <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl">
                         <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
                             <DialogTrigger asChild>

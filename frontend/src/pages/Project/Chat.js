@@ -2355,7 +2355,7 @@ export default function ProjectChat() {
 
 
                     {/* Input Area */}
-                    <div className="p-4 pt-2 pb-24 md:pb-6">
+                    <div className="px-2 pt-2 pb-24 md:p-4 md:pt-2 md:pb-6">
                         <div className="relative rounded-2xl bg-secondary/50 border border-white/10 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-all">
 
                             {/* Reference Picker Popover */}
@@ -2439,14 +2439,14 @@ export default function ProjectChat() {
                                             <div className="h-5 w-px bg-white/10" />
 
                                             {/* Toggles */}
-                                            <div className="flex items-center gap-2">
+                                            <div className="hidden md:flex items-center gap-2">
                                                 <Switch id="web-search" checked={isWebSearch} onCheckedChange={setIsWebSearch} className="scale-90" />
                                                 <Label htmlFor="web-search" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
                                                     <Globe className="h-3.5 w-3.5" /> Web
                                                 </Label>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
+                                            <div className="hidden md:flex items-center gap-2">
                                                 <Switch id="full-context" checked={isFullContext} onCheckedChange={setIsFullContext} className="scale-90" />
                                                 <Label htmlFor="full-context" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
                                                     <Paperclip className="h-3.5 w-3.5" /> All Files

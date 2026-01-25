@@ -217,9 +217,9 @@ function ProjectLayoutContent() {
             {/* Mobile Navigation */}
             <ProjectMobileNav baseUrl={baseUrl} readOnly={readOnly} />
 
-            {/* Main content wrapper */}
-            <div className="flex-1 min-w-0 h-screen pt-3 pr-3 pb-3 pl-3 md:pl-0 z-10">
-                <main className="h-full w-full bg-black/40 flex flex-col relative overflow-hidden rounded-2xl border border-white/5 shadow-2xl backdrop-blur-md">
+            {/* Main content wrapper - Full screen on mobile, padded on desktop */}
+            <div className="flex-1 min-w-0 h-screen p-0 md:pt-3 md:pr-3 md:pb-3 md:pl-0 z-10">
+                <main className="h-full w-full bg-black/40 flex flex-col relative overflow-hidden md:rounded-2xl md:border md:border-white/5 md:shadow-2xl backdrop-blur-md">
                     {/* Frame Gradient Overlays - Visible Inside The Glass */}
                     {/* Top Left: Primary Glow with multiple layers for depth */}
                     <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-primary/10 rounded-full blur-[150px] pointer-events-none z-0 mix-blend-screen" />
