@@ -282,7 +282,7 @@ export default function ProjectFiles() {
                 </div>
             )}
 
-            <div className="flex-1 flex flex-col p-6 lg:p-8 overflow-hidden">
+            <div className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 overflow-hidden">
                 {/* Header */}
                 <div className="flex-shrink-0 pb-6 border-b border-white/5">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

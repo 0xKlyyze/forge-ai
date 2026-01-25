@@ -221,20 +221,20 @@ export default function ProjectSettings() {
   ];
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full overflow-hidden">
       {/* Settings Navigation Sidebar */}
-      <aside className="w-60 border-r border-white/5 bg-black/20 backdrop-blur-md flex flex-col">
-        <div className="p-5">
+      <aside className="w-full md:w-60 border-b md:border-b-0 md:border-r border-white/5 bg-black/20 backdrop-blur-md flex flex-row md:flex-col shrink-0 overflow-x-auto md:overflow-visible no-scrollbar">
+        <div className="hidden md:block p-5">
           <h2 className="text-lg font-bold tracking-tight">Settings</h2>
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Configuration</p>
         </div>
 
-        <nav className="flex-1 px-2 space-y-1">
+        <nav className="flex md:flex-col gap-2 p-2 md:p-0 md:px-2 md:space-y-1 min-w-max md:min-w-0">
           {sections.map((section) => (
             <button
               key={section.id}
               onClick={() => setActiveSection(section.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${activeSection === section.id
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group whitespace-nowrap ${activeSection === section.id
                 ? 'bg-primary/10 text-primary border border-primary/20'
                 : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
                 }`}
@@ -243,12 +243,12 @@ export default function ProjectSettings() {
               <div className="text-left">
                 <p className="text-sm font-medium leading-none">{section.label}</p>
               </div>
-              {activeSection === section.id && <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-50" />}
+              {activeSection === section.id && <ChevronRight className="hidden md:block h-3.5 w-3.5 ml-auto opacity-50" />}
             </button>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-white/5">
+        <div className="hidden md:block p-3 border-t border-white/5">
           <div className="bg-secondary/10 rounded-xl p-3 border border-white/5">
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2 font-bold uppercase tracking-widest">
               <Info className="h-3 w-3" />
@@ -269,7 +269,7 @@ export default function ProjectSettings() {
       </aside>
 
       {/* Settings Content Area */}
-      <main className="flex-1 overflow-y-auto p-6 lg:p-10">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 pb-24 md:pb-6">
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
           {/* Header */}

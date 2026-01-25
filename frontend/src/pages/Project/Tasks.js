@@ -177,7 +177,7 @@ export default function ProjectTasks() {
         <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="h-full flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className="flex-shrink-0 p-6 lg:px-8 lg:pt-8 pb-4 border-b border-white/5">
+                <div className="flex-shrink-0 p-4 md:p-6 lg:px-8 lg:pt-8 pb-4 border-b border-white/5">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight">Mission Control</h1>
@@ -225,7 +225,7 @@ export default function ProjectTasks() {
                 </div>
 
                 {/* Content - Add fade animation for view transitions */}
-                <div className="flex-1 overflow-hidden p-6 lg:p-8 pt-4">
+                <div className="flex-1 overflow-hidden p-4 md:p-6 lg:p-8 pt-2 md:pt-4">
                     <div key={activeView} className="h-full animate-in fade-in duration-200">
                         {activeView === 'kanban' && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
