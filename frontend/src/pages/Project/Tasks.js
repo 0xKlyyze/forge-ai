@@ -268,7 +268,7 @@ export default function ProjectTasks() {
                         )}
 
                         {activeView === 'matrix' && (
-                            <div className="grid grid-cols-2 gap-4 h-full">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
                                 <MatrixQuadrant
                                     id="q1"
                                     title="Do First"

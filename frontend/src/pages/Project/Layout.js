@@ -13,6 +13,7 @@ import {
 import { Outlet, useNavigate, useParams, NavLink } from 'react-router-dom';
 import ColorThief from 'colorthief';
 import { ProjectProvider, useProjectContext } from '../../context/ProjectContext';
+import ProjectMobileNav from '../../components/ProjectMobileNav';
 
 const MainNavLink = ({ to, label, icon: Icon }) => (
     <NavLink
@@ -162,8 +163,8 @@ function ProjectLayoutContent() {
     return (
         <div ref={containerRef} className="h-screen w-screen bg-background flex antialiased overflow-hidden relative transition-colors duration-700">
 
-            {/* Navigation Sidebar */}
-            <nav className="w-20 flex-shrink-0 flex flex-col items-center pt-8 pb-3 z-20 bg-background/50 backdrop-blur-xl h-full">
+            {/* Navigation Sidebar - Desktop Only */}
+            <nav className="hidden md:flex w-20 flex-shrink-0 flex-col items-center pt-8 pb-3 z-20 bg-background/50 backdrop-blur-xl h-full">
                 {/* 1. App Icon - uses static favicon */}
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-xl mb-6 cursor-pointer overflow-hidden transition-transform hover:scale-105" onClick={() => navigate('/dashboard')}>
                     <img src="/favicon-96x96.png" alt="Forge AI" className="w-full h-full object-contain" />
@@ -213,8 +214,11 @@ function ProjectLayoutContent() {
                 </div>
             </nav>
 
+            {/* Mobile Navigation */}
+            <ProjectMobileNav baseUrl={baseUrl} readOnly={readOnly} />
+
             {/* Main content wrapper */}
-            <div className="flex-1 min-w-0 h-screen pt-3 pr-3 pb-3 pl-0 z-10">
+            <div className="flex-1 min-w-0 h-screen pt-3 pr-3 pb-3 pl-3 md:pl-0 z-10">
                 <main className="h-full w-full bg-black/40 flex flex-col relative overflow-hidden rounded-2xl border border-white/5 shadow-2xl backdrop-blur-md">
                     {/* Frame Gradient Overlays - Visible Inside The Glass */}
                     {/* Top Left: Primary Glow with multiple layers for depth */}

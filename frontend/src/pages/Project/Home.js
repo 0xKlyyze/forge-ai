@@ -180,7 +180,7 @@ export default function ProjectHome() {
             {/* Enhanced Gradient Background */}
             {/* Enhanced Gradient Background - Moved to Layout.js */}
 
-            <div className="relative p-6 lg:p-8 space-y-5 pb-28">
+            <div className="relative p-4 md:p-6 lg:p-8 space-y-5 pb-32 md:pb-28">
 
                 {/* ═══════════════════════════════════════════════════════════════════
             PROJECT HEADER

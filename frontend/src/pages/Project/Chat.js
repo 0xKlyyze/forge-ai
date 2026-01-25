@@ -2102,15 +2102,6 @@ export default function ProjectChat() {
                             </div>
                         </div>
                     )}
-                    {/* Toggle Sidebar Button - Hidden in read-only mode */}
-                    {!readOnly && (
-                        <button
-                            onClick={() => setShowSidebar(!showSidebar)}
-                            className="absolute top-4 left-4 z-10 p-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
-                        >
-                            <ChevronLeft className={`h-4 w-4 transition-transform ${showSidebar ? '' : 'rotate-180'}`} />
-                        </button>
-                    )}
 
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto pb-40" ref={scrollRef}>
@@ -2362,12 +2353,14 @@ export default function ProjectChat() {
                         </div>
                     </div>
 
-                    {/* Input Area - positioned relative to the chat section */}
-                    <div className="absolute bottom-0 left-0 right-0 p-6 pt-0">
-                        <div className="max-w-3xl mx-auto">
+
+                    {/* Input Area */}
+                    <div className="p-4 pt-2 pb-24 md:pb-6">
+                        <div className="relative rounded-2xl bg-secondary/50 border border-white/10 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-all">
+
                             {/* Reference Picker Popover */}
                             {showMentionPicker && (
-                                <div className="absolute bottom-full mb-2 w-72 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-64 flex flex-col">
+                                <div className="absolute bottom-full mb-2 w-72 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-64 flex flex-col z-50">
                                     <div className="p-2 border-b border-white/5">
                                         <p className="text-xs text-muted-foreground px-2">Reference a file or task</p>
                                     </div>
@@ -2406,210 +2399,214 @@ export default function ProjectChat() {
                             )}
 
                             {/* Toolbar - Hidden in read-only mode */}
-                            {!readOnly && (
-                                <div className="flex items-center justify-between px-4 py-2.5 bg-black/70 backdrop-blur-xl border border-white/10 border-b-0 rounded-t-2xl">
-                                    <div className="flex items-center gap-3">
-                                        {/* Model Selector */}
-                                        <div className="relative">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowModelPicker(!showModelPicker)}
-                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 transition-colors text-xs ${getModelColor(modelPreset)}`}
-                                            >
-                                                {getModelIcon(modelPreset)}
-                                                <span>{models[modelPreset]?.name || 'Fast'}</span>
-                                                <ChevronDown className="h-3 w-3 opacity-50" />
-                                            </button>
-                                            {showModelPicker && (
-                                                <div className="absolute bottom-full mb-2 left-0 w-56 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                                                    {Object.entries(models).map(([key, model]) => (
-                                                        <button
-                                                            key={key}
-                                                            type="button"
-                                                            onClick={() => { setModelPreset(key); setShowModelPicker(false); }}
-                                                            className={`w-full text-left px-4 py-3 hover:bg-primary/10 flex items-center gap-3 transition-colors ${modelPreset === key ? 'bg-primary/20' : ''}`}
-                                                        >
-                                                            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${getModelColor(key)} bg-secondary/50`}>
-                                                                {getModelIcon(key)}
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-sm font-medium">{model.name}</div>
-                                                                <div className="text-xs text-muted-foreground">{model.description}</div>
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
+                            {
+                                !readOnly && (
+                                    <div className="flex items-center justify-between px-4 py-2.5 bg-black/70 backdrop-blur-xl border border-white/10 border-b-0 rounded-t-2xl">
+                                        <div className="flex items-center gap-3">
+                                            {/* Model Selector */}
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowModelPicker(!showModelPicker)}
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 transition-colors text-xs ${getModelColor(modelPreset)}`}
+                                                >
+                                                    {getModelIcon(modelPreset)}
+                                                    <span>{models[modelPreset]?.name || 'Fast'}</span>
+                                                    <ChevronDown className="h-3 w-3 opacity-50" />
+                                                </button>
+                                                {showModelPicker && (
+                                                    <div className="absolute bottom-full mb-2 left-0 w-56 bg-background/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                                                        {Object.entries(models).map(([key, model]) => (
+                                                            <button
+                                                                key={key}
+                                                                type="button"
+                                                                onClick={() => { setModelPreset(key); setShowModelPicker(false); }}
+                                                                className={`w-full text-left px-4 py-3 hover:bg-primary/10 flex items-center gap-3 transition-colors ${modelPreset === key ? 'bg-primary/20' : ''}`}
+                                                            >
+                                                                <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${getModelColor(key)} bg-secondary/50`}>
+                                                                    {getModelIcon(key)}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-sm font-medium">{model.name}</div>
+                                                                    <div className="text-xs text-muted-foreground">{model.description}</div>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="h-5 w-px bg-white/10" />
+
+                                            {/* Toggles */}
+                                            <div className="flex items-center gap-2">
+                                                <Switch id="web-search" checked={isWebSearch} onCheckedChange={setIsWebSearch} className="scale-90" />
+                                                <Label htmlFor="web-search" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                                                    <Globe className="h-3.5 w-3.5" /> Web
+                                                </Label>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Switch id="full-context" checked={isFullContext} onCheckedChange={setIsFullContext} className="scale-90" />
+                                                <Label htmlFor="full-context" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                                                    <Paperclip className="h-3.5 w-3.5" /> All Files
+                                                </Label>
+                                            </div>
                                         </div>
 
-                                        <div className="h-5 w-px bg-white/10" />
-
-                                        {/* Toggles */}
-                                        <div className="flex items-center gap-2">
-                                            <Switch id="web-search" checked={isWebSearch} onCheckedChange={setIsWebSearch} className="scale-90" />
-                                            <Label htmlFor="web-search" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
-                                                <Globe className="h-3.5 w-3.5" /> Web
-                                            </Label>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <Switch id="full-context" checked={isFullContext} onCheckedChange={setIsFullContext} className="scale-90" />
-                                            <Label htmlFor="full-context" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
-                                                <Paperclip className="h-3.5 w-3.5" /> All Files
-                                            </Label>
-                                        </div>
+                                        {/* Referenced Items (Mentions) ONLY - Attachment chips removal since they are inline now */}
+                                        {referencedItems.length > 0 && (
+                                            <div className="flex items-center gap-2 overflow-x-auto max-w-xl no-scrollbar">
+                                                {referencedItems.map((item, idx) => (
+                                                    <span key={`ref-${item.type}-${item.id}-${idx}`} className={`text-xs px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
+                                                        }`}>
+                                                        {item.type === 'task' ? <SquareCheck className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                                                        <span className="truncate max-w-[80px]">{item.name || item.title}</span>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {/* Referenced Items (Mentions) ONLY - Attachment chips removal since they are inline now */}
-                                    {referencedItems.length > 0 && (
-                                        <div className="flex items-center gap-2 overflow-x-auto max-w-xl no-scrollbar">
-                                            {referencedItems.map((item, idx) => (
-                                                <span key={`ref-${item.type}-${item.id}-${idx}`} className={`text-xs px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
-                                                    }`}>
-                                                    {item.type === 'task' ? <SquareCheck className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
-                                                    <span className="truncate max-w-[80px]">{item.name || item.title}</span>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                )
+                            }
 
                             {/* Input Box - Contains file chips + input + buttons */}
-                            {readOnly ? (
-                                <div className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/10 p-5 flex items-center justify-center text-center gap-4">
-                                    <div className="flex-1">
-                                        <p className="text-sm text-muted-foreground">
-                                            <span className="text-white font-medium">Want to try this yourself?</span> Create a free account to start building with Forge AI.
-                                        </p>
+                            {
+                                readOnly ? (
+                                    <div className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/10 p-5 flex items-center justify-center text-center gap-4">
+                                        <div className="flex-1">
+                                            <p className="text-sm text-muted-foreground">
+                                                <span className="text-white font-medium">Want to try this yourself?</span> Create a free account to start building with Forge AI.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={() => window.location.href = '/register'}
+                                            className="rounded-xl px-6 font-semibold shadow-lg shadow-primary/25 flex-shrink-0"
+                                        >
+                                            Get Started <ArrowRight className="ml-2 h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    <Button
-                                        onClick={() => window.location.href = '/register'}
-                                        className="rounded-xl px-6 font-semibold shadow-lg shadow-primary/25 flex-shrink-0"
+                                ) : (
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            handleSend(e);
+                                        }}
+                                        className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-b-2xl border-t-0 border-white/10"
                                     >
-                                        Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        handleSend(e);
-                                    }}
-                                    className="relative bg-secondary/80 backdrop-blur-xl shadow-2xl rounded-b-2xl border-t-0 border-white/10"
-                                >
-                                    {/* Uploaded Files Preview - Inside form for visual cohesion */}
-                                    {uploadedFiles.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2 border-b border-white/5">
-                                            {uploadedFiles.map(file => (
-                                                <div
-                                                    key={file.id}
-                                                    className="group flex items-center gap-1.5 px-2 py-1 bg-primary/15 hover:bg-primary/25 border border-primary/30 rounded-lg text-xs transition-all"
-                                                >
-                                                    {/* Image thumbnail or file icon */}
-                                                    {file.type === 'image' ? (
-                                                        <img
-                                                            src={file.dataUrl}
-                                                            alt={file.name}
-                                                            className="h-6 w-6 rounded object-cover shrink-0"
-                                                        />
-                                                    ) : (
-                                                        <Upload className="h-3 w-3 text-primary shrink-0" />
-                                                    )}
-                                                    <span className="truncate max-w-[100px] text-primary font-medium">{file.name}</span>
-                                                    <span className="text-muted-foreground text-[10px]">
-                                                        {file.size > 1024 * 1024
-                                                            ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
-                                                            : `${(file.size / 1024).toFixed(0)}KB`
-                                                        }
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeUploadedFile(file.id)}
-                                                        className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-primary/60 hover:text-white transition-colors"
+                                        {/* Uploaded Files Preview - Inside form for visual cohesion */}
+                                        {uploadedFiles.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2 border-b border-white/5">
+                                                {uploadedFiles.map(file => (
+                                                    <div
+                                                        key={file.id}
+                                                        className="group flex items-center gap-1.5 px-2 py-1 bg-primary/15 hover:bg-primary/25 border border-primary/30 rounded-lg text-xs transition-all"
                                                     >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                        {/* Image thumbnail or file icon */}
+                                                        {file.type === 'image' ? (
+                                                            <img
+                                                                src={file.dataUrl}
+                                                                alt={file.name}
+                                                                className="h-6 w-6 rounded object-cover shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <Upload className="h-3 w-3 text-primary shrink-0" />
+                                                        )}
+                                                        <span className="truncate max-w-[100px] text-primary font-medium">{file.name}</span>
+                                                        <span className="text-muted-foreground text-[10px]">
+                                                            {file.size > 1024 * 1024
+                                                                ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
+                                                                : `${(file.size / 1024).toFixed(0)}KB`
+                                                            }
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeUploadedFile(file.id)}
+                                                            className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-primary/60 hover:text-white transition-colors"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
 
-                                    {/* Input Row */}
-                                    <div className="flex items-end min-h-[56px]">
-                                        <div className="flex-1 relative min-h-[56px]">
-                                            <RichInput
-                                                ref={inputRef}
-                                                value={input}
-                                                onChange={handleInputChange}
-                                                onPaste={handlePaste}
-                                                onChipDelete={(tagContent) => {
-                                                    // Parse the tag to get the name, e.g. "@[File: filename.md]" -> "filename.md"
-                                                    const fileMatch = tagContent.match(/@\[File: ([^\]]+)\]/);
-                                                    const taskMatch = tagContent.match(/@\[Task: ([^\]]+)\]/);
+                                        {/* Input Row */}
+                                        <div className="flex items-end min-h-[56px]">
+                                            <div className="flex-1 relative min-h-[56px]">
+                                                <RichInput
+                                                    ref={inputRef}
+                                                    value={input}
+                                                    onChange={handleInputChange}
+                                                    onPaste={handlePaste}
+                                                    onChipDelete={(tagContent) => {
+                                                        // Parse the tag to get the name, e.g. "@[File: filename.md]" -> "filename.md"
+                                                        const fileMatch = tagContent.match(/@\[File: ([^\]]+)\]/);
+                                                        const taskMatch = tagContent.match(/@\[Task: ([^\]]+)\]/);
 
-                                                    if (fileMatch) {
-                                                        const fileName = fileMatch[1];
-                                                        setReferencedItems(prev => prev.filter(item =>
-                                                            !(item.type === 'file' && item.name === fileName)
-                                                        ));
-                                                    } else if (taskMatch) {
-                                                        const taskTitle = taskMatch[1];
-                                                        setReferencedItems(prev => prev.filter(item =>
-                                                            !(item.type === 'task' && item.title === taskTitle)
-                                                        ));
-                                                    }
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        handleSend(e);
-                                                    }
-                                                }}
-                                                placeholder="Ask anything... (@ to reference files/tasks)"
-                                                className="w-full min-h-[56px] max-h-[200px] overflow-y-auto rounded-bl-2xl bg-transparent"
-                                            />
+                                                        if (fileMatch) {
+                                                            const fileName = fileMatch[1];
+                                                            setReferencedItems(prev => prev.filter(item =>
+                                                                !(item.type === 'file' && item.name === fileName)
+                                                            ));
+                                                        } else if (taskMatch) {
+                                                            const taskTitle = taskMatch[1];
+                                                            setReferencedItems(prev => prev.filter(item =>
+                                                                !(item.type === 'task' && item.title === taskTitle)
+                                                            ));
+                                                        }
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            handleSend(e);
+                                                        }
+                                                    }}
+                                                    placeholder="Ask anything... (@ to reference files/tasks)"
+                                                    className="w-full min-h-[56px] max-h-[200px] overflow-y-auto rounded-bl-2xl bg-transparent"
+                                                />
+                                            </div>
+                                            <div className="h-[56px] flex items-center gap-1 pr-2">
+                                                {/* Hidden File Input */}
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    multiple
+                                                    accept=".md,.txt,.json,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.go,.rs,.yaml,.yml,.xml,.html,.css,.scss,.png,.jpg,.jpeg,.gif,.webp,image/*"
+                                                    className="hidden"
+                                                    onChange={handleFileInputChange}
+                                                />
+                                                {/* Upload Button */}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="h-10 w-10 rounded-xl hover:bg-primary/10 transition-all shrink-0 text-muted-foreground hover:text-primary"
+                                                    title="Upload files"
+                                                >
+                                                    <Paperclip className="h-5 w-5" />
+                                                </Button>
+                                                {/* Send Button */}
+                                                <Button
+                                                    type="submit"
+                                                    size="icon"
+                                                    disabled={loading || (!input.trim() && attachedSelections.length === 0 && uploadedFiles.length === 0)}
+                                                    className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all shrink-0"
+                                                >
+                                                    <Send className="h-5 w-5" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="h-[56px] flex items-center gap-1 pr-2">
-                                            {/* Hidden File Input */}
-                                            <input
-                                                ref={fileInputRef}
-                                                type="file"
-                                                multiple
-                                                accept=".md,.txt,.json,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.go,.rs,.yaml,.yml,.xml,.html,.css,.scss,.png,.jpg,.jpeg,.gif,.webp,image/*"
-                                                className="hidden"
-                                                onChange={handleFileInputChange}
-                                            />
-                                            {/* Upload Button */}
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="h-10 w-10 rounded-xl hover:bg-primary/10 transition-all shrink-0 text-muted-foreground hover:text-primary"
-                                                title="Upload files"
-                                            >
-                                                <Paperclip className="h-5 w-5" />
-                                            </Button>
-                                            {/* Send Button */}
-                                            <Button
-                                                type="submit"
-                                                size="icon"
-                                                disabled={loading || (!input.trim() && attachedSelections.length === 0 && uploadedFiles.length === 0)}
-                                                className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all shrink-0"
-                                            >
-                                                <Send className="h-5 w-5" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </form>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                                    </form>
+                                )
+                            }
+                        </div >
+                    </div >
+                </div >
 
                 {/* Delete Confirmation Modal */}
-                <Dialog open={!!deleteConfirmSession} onOpenChange={(open) => !open && setDeleteConfirmSession(null)}>
+                < Dialog open={!!deleteConfirmSession} onOpenChange={(open) => !open && setDeleteConfirmSession(null)}>
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                             <DialogTitle>Delete Conversation?</DialogTitle>
@@ -2635,78 +2632,82 @@ export default function ProjectChat() {
                             </Button>
                         </DialogFooter>
                     </DialogContent>
-                </Dialog>
-            </div>
+                </Dialog >
+            </div >
 
             {/* AI Agent Editor Panel - Inline rounded container */}
-            {editorPanelOpen && agentFile && (
-                <div className="w-[450px] flex-shrink-0 p-4 pl-0">
-                    <AgentEditorPanel
-                        file={agentFile}
-                        originalContent={originalContent}
-                        isDiffMode={isDiffMode}
-                        editSummary={editSummary}
-                        onContentChange={handleAgentFileContentChange}
-                        onAcceptChanges={handleAcceptChanges}
-                        onRejectChanges={handleRejectChanges}
-                        onOpenInEditor={handleOpenInFullEditor}
-                        onClose={handleCloseEditorPanel}
-                        isSaving={isSavingFile}
-                        onAddToChat={handleAddToChat}
-                        isAccepted={isDiffAccepted}
-                        onOpenLatest={() => {
-                            const latest = files.find(f => f.name === agentFile.name);
-                            if (latest) {
-                                setAgentFile(latest);
-                                setIsDiffMode(false);
-                                toast.info(`Switched to latest version of ${latest.name}`);
-                            } else {
-                                toast.error("Latest version NOT found in project");
-                            }
-                        }}
-                    />
-                </div>
-            )}
+            {
+                editorPanelOpen && agentFile && (
+                    <div className="w-[450px] flex-shrink-0 p-4 pl-0">
+                        <AgentEditorPanel
+                            file={agentFile}
+                            originalContent={originalContent}
+                            isDiffMode={isDiffMode}
+                            editSummary={editSummary}
+                            onContentChange={handleAgentFileContentChange}
+                            onAcceptChanges={handleAcceptChanges}
+                            onRejectChanges={handleRejectChanges}
+                            onOpenInEditor={handleOpenInFullEditor}
+                            onClose={handleCloseEditorPanel}
+                            isSaving={isSavingFile}
+                            onAddToChat={handleAddToChat}
+                            isAccepted={isDiffAccepted}
+                            onOpenLatest={() => {
+                                const latest = files.find(f => f.name === agentFile.name);
+                                if (latest) {
+                                    setAgentFile(latest);
+                                    setIsDiffMode(false);
+                                    toast.info(`Switched to latest version of ${latest.name}`);
+                                } else {
+                                    toast.error("Latest version NOT found in project");
+                                }
+                            }}
+                        />
+                    </div>
+                )
+            }
 
             {/* Mockup Preview Panel - For UI mockups */}
-            {mockupPanelOpen && mockupPanelFile && (
-                <div
-                    className="flex-shrink-0 p-4 pl-0 relative"
-                    style={{ width: `${mockupPanelWidth}px` }}
-                >
-                    {/* Resize Handle */}
+            {
+                mockupPanelOpen && mockupPanelFile && (
                     <div
-                        onMouseDown={handleResizeMouseDown}
-                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+                        className="flex-shrink-0 p-4 pl-0 relative"
+                        style={{ width: `${mockupPanelWidth}px` }}
                     >
-                        <div className="absolute left-1 top-1/2 -translate-y-1/2 h-16 w-1 rounded-full bg-white/10 group-hover:bg-violet-500/50 transition-colors" />
+                        {/* Resize Handle */}
+                        <div
+                            onMouseDown={handleResizeMouseDown}
+                            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+                        >
+                            <div className="absolute left-1 top-1/2 -translate-y-1/2 h-16 w-1 rounded-full bg-white/10 group-hover:bg-violet-500/50 transition-colors" />
+                        </div>
+                        <MockupPreviewPanel
+                            file={mockupPanelFile}
+                            originalContent={mockupOriginalContent}
+                            isDiffMode={isMockupDiffMode}
+                            editSummary={mockupEditSummary}
+                            onContentChange={handleMockupContentChange}
+                            onAcceptChanges={handleAcceptMockupChanges}
+                            onRejectChanges={handleRejectMockupChanges}
+                            onOpenInEditor={handleOpenMockupInFullEditor}
+                            onClose={handleCloseMockupPanel}
+                            isSaving={false}
+                            isAccepted={isMockupDiffAccepted}
+                            onOpenLatest={() => {
+                                const latest = files.find(f => f.name === mockupPanelFile.name);
+                                if (latest) {
+                                    setMockupPanelFile(latest);
+                                    setIsMockupDiffMode(false);
+                                    toast.info(`Switched to latest version of ${latest.name}`);
+                                } else {
+                                    toast.error("Latest version NOT found in project");
+                                }
+                            }}
+                        />
                     </div>
-                    <MockupPreviewPanel
-                        file={mockupPanelFile}
-                        originalContent={mockupOriginalContent}
-                        isDiffMode={isMockupDiffMode}
-                        editSummary={mockupEditSummary}
-                        onContentChange={handleMockupContentChange}
-                        onAcceptChanges={handleAcceptMockupChanges}
-                        onRejectChanges={handleRejectMockupChanges}
-                        onOpenInEditor={handleOpenMockupInFullEditor}
-                        onClose={handleCloseMockupPanel}
-                        isSaving={false}
-                        isAccepted={isMockupDiffAccepted}
-                        onOpenLatest={() => {
-                            const latest = files.find(f => f.name === mockupPanelFile.name);
-                            if (latest) {
-                                setMockupPanelFile(latest);
-                                setIsMockupDiffMode(false);
-                                toast.info(`Switched to latest version of ${latest.name}`);
-                            } else {
-                                toast.error("Latest version NOT found in project");
-                            }
-                        }}
-                    />
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
 
     );
 }
