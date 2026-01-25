@@ -142,7 +142,7 @@ export default function Dashboard() {
         </header>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto px-10 pb-10">
+        <div className="flex-1 overflow-y-auto px-10 pb-24">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

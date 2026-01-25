@@ -104,24 +104,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, onLogout, inb
                     <span className="font-medium text-sm">Sign Out</span>
                 </button>
 
-                {/* System Status */}
-                <div className="mt-6 px-4 py-3 bg-zinc-900/50 rounded-lg border border-white/5">
-                    <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] text-zinc-500">System Status</span>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                            <span className="text-[10px] text-green-500 font-medium">Online</span>
-                        </div>
-                    </div>
-                    <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: "100%" }}
-                            transition={{ duration: 2 }}
-                            className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
-                        />
-                    </div>
-                </div>
+
             </div>
         </div>
     );
