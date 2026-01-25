@@ -959,6 +959,7 @@ class DashboardResponse(BaseModel):
     projects: List[dict]
     recent_conversations: List[dict]
     priority_tasks: List[dict]
+    invites: List[dict] = []
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
@@ -966,7 +967,14 @@ async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
     
     # 1. Get projects with file/task counts
     projects = []
-    cursor = db.projects.find({"user_id": current_user["id"]}).sort("last_edited", -1)
+    # Find projects where user is owner OR collaborator
+    query = {
+        "$or": [
+            {"user_id": current_user["id"]},
+            {"collaborators": current_user["id"]}
+        ]
+    }
+    cursor = db.projects.find(query).sort("last_edited", -1)
     async for project in cursor:
         project_id = str(project["_id"])
         
@@ -980,6 +988,8 @@ async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
             "name": project["name"],
             "status": project.get("status", "planning"),
             "icon": project.get("icon", ""),
+            "user_id": project.get("user_id"),
+            "is_owner": project.get("user_id") == current_user["id"],
             "file_count": file_count,
             "task_count": task_count,
             "completed_tasks": completed_tasks,
@@ -1032,10 +1042,37 @@ async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
                 "status": task.get("status", "todo")
             })
     
+    # 4. Get active invites for the current user
+    invites = []
+    invite_cursor = db.share_links.find({
+        "type": "invite", 
+        "status": "active",
+        "target_email": current_user["email"]
+    }).sort("created_at", -1)
+    
+    async for invite in invite_cursor:
+        i_project = await db.projects.find_one({"_id": ObjectId(invite["project_id"])})
+        if not i_project: continue
+        
+        inviter = await db.users.find_one({"_id": ObjectId(invite["created_by"])})
+        
+        invites.append({
+            "id": str(invite["_id"]),
+            "token": invite["token"],
+            "project_id": str(i_project["_id"]),
+            "project_name": i_project["name"],
+            "project_icon": i_project.get("icon", ""),
+            "inviter_email": inviter.get("email") if inviter else "Unknown",
+            "inviter_handle": inviter.get("handle"),
+            "inviter_avatar": inviter.get("avatar_url"),
+            "created_at": invite["created_at"]
+        })
+
     return DashboardResponse(
         projects=projects,
         recent_conversations=recent_conversations,
-        priority_tasks=priority_tasks
+        priority_tasks=priority_tasks,
+        invites=invites
     )
 
 @app.get("/api/projects/{project_id}/dashboard")

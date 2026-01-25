@@ -460,3 +460,40 @@ export function useAcceptDocumentChanges(projectId) {
         },
     });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVITATIONS - Accept/Decline project invites
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function useAcceptInvite() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (token) =>
+            api.post(`/invites/${token}/accept`).then(res => res.data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+            queryClient.invalidateQueries({ queryKey: projectKeys.all });
+            toast.success('Joined project successfully');
+        },
+        onError: (error) => {
+            toast.error(`Failed to accept invite: ${error.response?.data?.detail || error.message}`);
+        },
+    });
+}
+
+export function useDeclineInvite() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (token) =>
+            api.post(`/invites/${token}/decline`).then(res => res.data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+            toast.success('Invite declined');
+        },
+        onError: (error) => {
+            toast.error(`Failed to decline invite: ${error.response?.data?.detail || error.message}`);
+        },
+    });
+}
