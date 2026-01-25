@@ -27,6 +27,7 @@ import {
 
 // Components
 import DashboardSidebar from '../components/DashboardSidebar';
+import MobileBottomNav from '../components/MobileBottomNav';
 import ProjectsTab from '../components/dashboard/ProjectsTab';
 import InboxTab from '../components/dashboard/InboxTab';
 import ProfileTab from '../components/dashboard/ProfileTab';
@@ -101,7 +102,7 @@ export default function Dashboard() {
   const sharedProjects = data?.projects?.filter(p => !p.is_owner) || [];
 
   return (
-    <div className="flex h-screen w-screen bg-black overflow-hidden font-sans antialiased text-zinc-200">
+    <div className="flex flex-col md:flex-row h-screen w-screen bg-black overflow-hidden font-sans antialiased text-zinc-200">
       {/* Background Glows */}
       <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[160px] pointer-events-none z-0 mix-blend-screen animate-pulse" />
       <div className="fixed bottom-[-10%] right-[-5%] w-[50%] h-[50%] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen" />
@@ -115,10 +116,17 @@ export default function Dashboard() {
         inboxCount={data?.invites?.length || 0}
       />
 
+      {/* Mobile Navigation */}
+      <MobileBottomNav
+        activeTab={activeTab === 'shared' ? 'shared' : activeTab}
+        onTabChange={setActiveTab}
+        inboxCount={data?.invites?.length || 0}
+      />
+
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 h-full relative z-10 overflow-hidden">
         {/* Header */}
-        <header className="flex items-center justify-between px-10 py-8 shrink-0">
+        <header className="flex items-center justify-between px-6 py-6 md:px-10 md:py-8 shrink-0">
           <div>
             <h2 className="text-3xl font-bold text-white tracking-tight">
               {activeTab === 'projects' && 'My Projects'}
@@ -142,7 +150,7 @@ export default function Dashboard() {
         </header>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto px-10 pb-24">
+        <div className="flex-1 overflow-y-auto px-4 pb-28 md:px-10 md:pb-24">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

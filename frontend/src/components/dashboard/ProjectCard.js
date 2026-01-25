@@ -35,10 +35,19 @@ function use3DTilt(stiffness = 500, damping = 100, intensity = 5) {
         y.set(0);
     }
 
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.matchMedia("(max-width: 768px)").matches);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     const rotateX = useTransform(mouseY, [-0.5, 0.5], [intensity, -intensity]);
     const rotateY = useTransform(mouseX, [-0.5, 0.5], [-intensity, intensity]);
 
-    return { onMouseMove, onMouseLeave, rotateX, rotateY };
+    return isMobile ? { onMouseMove: () => { }, onMouseLeave: () => { }, rotateX: 0, rotateY: 0 } : { onMouseMove, onMouseLeave, rotateX, rotateY };
 }
 
 // --- Helper: RGB to HSL ---
@@ -182,7 +191,7 @@ export default function ProjectCard({ project, onDelete }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100"
+                                className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all scale-100 md:scale-90 md:group-hover:scale-100"
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();

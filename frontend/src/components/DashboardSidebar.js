@@ -54,7 +54,7 @@ export default function DashboardSidebar({ activeTab, onTabChange, onLogout, inb
     ];
 
     return (
-        <div className="w-72 h-full flex flex-col bg-zinc-950/50 backdrop-blur-2xl border-r border-white/5 p-6 z-20">
+        <div className="hidden md:flex w-72 h-full flex-col bg-zinc-950/50 backdrop-blur-2xl border-r border-white/5 p-6 z-20">
             {/* Brand */}
             <div className="flex items-center gap-4 mb-10 px-2">
                 <div className="relative group">
