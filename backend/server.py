@@ -705,6 +705,12 @@ async def accept_invite(token: str, current_user: dict = Depends(get_current_use
         }
     )
     
+    # Mark invite as accepted
+    await db.share_links.update_one(
+        {"_id": invite["_id"]},
+        {"$set": {"status": "accepted"}}
+    )
+    
     return {"detail": "Joined project successfully", "project_id": project_id}
 
 @app.post("/api/invites/{token}/decline")

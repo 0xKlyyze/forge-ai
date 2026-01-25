@@ -481,7 +481,7 @@ export function useAcceptInvite() {
                 };
             });
 
-            queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.main() });
             queryClient.invalidateQueries({ queryKey: projectKeys.all });
             toast.success('Joined project successfully');
         },
@@ -507,7 +507,7 @@ export function useDeclineInvite() {
                 };
             });
 
-            queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.main() });
             toast.success('Invite declined');
         },
         onError: (error) => {
