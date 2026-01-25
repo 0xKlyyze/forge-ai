@@ -145,27 +145,26 @@ function HeroProject({ project, priorityTasks = [], onDelete }) {
                                     <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[9px] font-bold uppercase tracking-wider border border-blue-500/20">Resume Work</span>
                                     <span className="text-[10px] text-zinc-500 font-medium">{project.last_edited ? formatDistanceToNow(new Date(project.last_edited), { addSuffix: true }) : 'Just now'}</span>
                                 </div>
-                                <div className="flex items-center justify-between gap-4">
-                                    <h2 className="text-3xl font-bold text-white tracking-tight truncate">{project.name}</h2>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-10 w-10 text-white/5 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            onDelete(project);
-                                        }}
-                                    >
-                                        <Trash2 className="h-5 w-5" />
-                                    </Button>
-                                </div>
+                                <h2 className="text-3xl font-bold text-white tracking-tight truncate">{project.name}</h2>
                                 <div className="flex items-center gap-2 text-sm text-zinc-400">
                                     <Activity className="w-4 h-4 text-green-500" />
                                     {project.status || 'Active Development'}
                                 </div>
                             </div>
                         </div>
+
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-6 right-6 h-10 w-10 text-white/10 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all shrink-0 z-20"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onDelete(project);
+                            }}
+                        >
+                            <Trash2 className="h-5 w-5" />
+                        </Button>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto">
                             {[

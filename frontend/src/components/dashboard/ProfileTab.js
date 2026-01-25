@@ -1,21 +1,30 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../../authContext';
 import { Button } from '../ui/button';
-import { Mail, Shield, Calendar, Camera, Upload, CheckCircle2, Settings } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Mail, Shield, Calendar, Camera, Upload, CheckCircle2, Settings, Edit3, Loader2, Check, X, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Input } from '../ui/input';
 import { toast } from 'sonner';
+import api from '../../utils/api';
 
 export default function ProfileTab() {
     const { user, updateUser } = useAuth();
     const fileInputRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
 
+    // Handle Editing State
+    const [isEditingHandle, setIsEditingHandle] = useState(false);
+    const [newHandle, setNewHandle] = useState(user?.handle || '');
+    const [isChecking, setIsChecking] = useState(false);
+    const [availability, setAvailability] = useState(null); // { available: bool, reason: string }
+    const [isSaving, setIsSaving] = useState(false);
+
     const handleAvatarClick = () => {
         fileInputRef.current?.click();
     };
 
-    const handleFileChange = (event) => {
+    const handleFileChange = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
@@ -26,12 +35,60 @@ export default function ProfileTab() {
 
         setIsUploading(true);
         const reader = new FileReader();
-        reader.onloadend = () => {
-            updateUser({ avatar_url: reader.result });
-            toast.success('Profile picture updated');
-            setIsUploading(false);
+        reader.onloadend = async () => {
+            try {
+                await updateUser({ avatar_url: reader.result });
+                toast.success('Profile picture updated');
+            } catch (err) {
+                toast.error('Failed to update profile picture');
+            } finally {
+                setIsUploading(false);
+            }
         };
         reader.readAsDataURL(file);
+    };
+
+    // Debounced handle check
+    useEffect(() => {
+        if (!isEditingHandle) return;
+
+        const timer = setTimeout(async () => {
+            if (!newHandle || newHandle === user?.handle) {
+                setAvailability(null);
+                return;
+            }
+
+            setIsChecking(true);
+            try {
+                const response = await api.get(`/auth/check-handle?handle=${encodeURIComponent(newHandle)}`);
+                setAvailability(response.data);
+            } catch (err) {
+                console.error("Check handle failed", err);
+                setAvailability({ available: false, reason: "Error checking availability" });
+            } finally {
+                setIsChecking(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [newHandle, isEditingHandle, user?.handle]);
+
+    const handleSaveHandle = async () => {
+        if (!availability?.available && newHandle !== user?.handle) {
+            toast.error(availability?.reason || "Handle not available");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await updateUser({ handle: availability?.handle || newHandle });
+            toast.success("Handle updated successfully");
+            setIsEditingHandle(false);
+        } catch (err) {
+            toast.error(err.response?.data?.detail || "Failed to update handle");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const initials = user?.email
@@ -80,19 +137,84 @@ export default function ProfileTab() {
                                 </Avatar>
 
                                 <div className="absolute bottom-2 right-2 bg-blue-600 p-2.5 rounded-full border-2 border-zinc-950 shadow-xl translate-x-1/4 translate-y-1/4 group-hover:scale-110 transition-transform">
-                                    {isUploading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Upload className="w-4 h-4 text-white" />}
+                                    {isUploading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Upload className="w-4 h-4 text-white" />}
                                 </div>
                             </div>
 
                             <h2 className="text-2xl font-bold text-white mb-2">{user?.name || 'User'}</h2>
-                            <div className="relative group/edit flex items-center justify-center gap-2">
-                                <span className="text-blue-400 font-mono text-sm">{user?.handle || '@set_handle'}</span>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/edit:opacity-100 transition-opacity" onClick={() => {
-                                    const h = prompt("Enter new handle:", user?.handle || "");
-                                    if (h) updateUser({ handle: h });
-                                }}>
-                                    <Settings className="w-3 h-3" />
-                                </Button>
+
+                            <div className="flex flex-col items-center gap-2">
+                                <AnimatePresence mode="wait">
+                                    {!isEditingHandle ? (
+                                        <motion.div
+                                            key="display"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="relative group/edit flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/5 border border-blue-500/10 hover:border-blue-500/30 transition-all cursor-pointer"
+                                            onClick={() => {
+                                                setNewHandle(user?.handle || '');
+                                                setIsEditingHandle(true);
+                                            }}
+                                        >
+                                            <span className="text-blue-400 font-mono text-sm">{user?.handle || '@set_handle'}</span>
+                                            <Edit3 className="w-3.5 h-3.5 text-blue-400/50 group-hover/edit:text-blue-400 transition-colors" />
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="edit"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="w-full space-y-3"
+                                        >
+                                            <div className="relative">
+                                                <Input
+                                                    value={newHandle}
+                                                    onChange={(e) => setNewHandle(e.target.value)}
+                                                    placeholder="@handle"
+                                                    className={`
+                                                        h-10 bg-black/40 border-white/10 text-center font-mono text-sm rounded-xl focus:ring-blue-500/50
+                                                        ${availability?.available === true ? 'border-green-500/30' : ''}
+                                                        ${availability?.available === false ? 'border-red-500/30' : ''}
+                                                    `}
+                                                    autoFocus
+                                                />
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                    {isChecking && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                                                    {!isChecking && availability?.available === true && <Check className="w-4 h-4 text-green-500" />}
+                                                    {!isChecking && availability?.available === false && <X className="w-4 h-4 text-red-500" />}
+                                                </div>
+                                            </div>
+
+                                            {availability?.available === false && (
+                                                <p className="text-[10px] text-red-400/80 font-medium">{availability.reason}</p>
+                                            )}
+
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    className="flex-1 h-9 rounded-xl border border-white/5 text-zinc-400 hover:text-white"
+                                                    onClick={() => {
+                                                        setIsEditingHandle(false);
+                                                        setAvailability(null);
+                                                    }}
+                                                    disabled={isSaving}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    className="flex-1 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                                                    onClick={handleSaveHandle}
+                                                    disabled={isSaving || (newHandle !== user?.handle && !availability?.available)}
+                                                >
+                                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                                    Save
+                                                </Button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </div>
                     </motion.div>

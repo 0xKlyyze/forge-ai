@@ -471,7 +471,16 @@ export function useAcceptInvite() {
     return useMutation({
         mutationFn: (token) =>
             api.post(`/invites/${token}/accept`).then(res => res.data),
-        onSuccess: () => {
+        onSuccess: (data, token) => {
+            // Remove from dashboard cache immediately for delightful UI removal
+            queryClient.setQueryData(dashboardKeys.main(), (old) => {
+                if (!old || !old.invites) return old;
+                return {
+                    ...old,
+                    invites: old.invites.filter(i => i.token !== token)
+                };
+            });
+
             queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
             queryClient.invalidateQueries({ queryKey: projectKeys.all });
             toast.success('Joined project successfully');
@@ -488,7 +497,16 @@ export function useDeclineInvite() {
     return useMutation({
         mutationFn: (token) =>
             api.post(`/invites/${token}/decline`).then(res => res.data),
-        onSuccess: () => {
+        onSuccess: (data, token) => {
+            // Remove from dashboard cache immediately for delightful UI removal
+            queryClient.setQueryData(dashboardKeys.main(), (old) => {
+                if (!old || !old.invites) return old;
+                return {
+                    ...old,
+                    invites: old.invites.filter(i => i.token !== token)
+                };
+            });
+
             queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
             toast.success('Invite declined');
         },

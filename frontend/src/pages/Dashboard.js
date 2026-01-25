@@ -188,8 +188,8 @@ export default function Dashboard() {
                   {activeTab === 'inbox' && (
                     <InboxTab
                       invites={data?.invites || []}
-                      onAccept={(token) => acceptInviteMutation.mutate(token)}
-                      onDecline={(token) => declineInviteMutation.mutate(token)}
+                      onAccept={(token) => acceptInviteMutation.mutateAsync(token)}
+                      onDecline={(token) => declineInviteMutation.mutateAsync(token)}
                       isLoading={isLoading}
                     />
                   )}

@@ -58,7 +58,14 @@ async def register(user: UserModel):
     result = await db.users.insert_one(new_user)
     created_user = await db.users.find_one({"_id": result.inserted_id})
     
-    return UserResponse(id=str(created_user["_id"]), email=created_user["email"])
+    return UserResponse(
+        id=str(created_user["_id"]), 
+        email=created_user["email"],
+        name=created_user.get("name"),
+        handle=created_user.get("handle"),
+        avatar_url=created_user.get("avatar_url"),
+        role=created_user.get("role", "Developer")
+    )
 
 @app.post("/api/auth/login")
 async def login(form_data: dict = Body(...)):
@@ -80,7 +87,14 @@ async def login(form_data: dict = Body(...)):
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
-        "user": {"id": str(user["_id"]), "email": user["email"]}
+        "user": {
+            "id": str(user["_id"]), 
+            "email": user["email"],
+            "name": user.get("name"),
+            "handle": user.get("handle"),
+            "avatar_url": user.get("avatar_url"),
+            "role": user.get("role", "Developer")
+        }
     }
 
 @app.post("/api/auth/refresh")
@@ -160,9 +174,38 @@ async def update_profile(updates: dict = Body(...), current_user: dict = Depends
     return UserResponse(
         id=str(updated_user["_id"]),
         email=updated_user["email"],
+        name=updated_user.get("name"),
         handle=updated_user.get("handle"),
-        avatar_url=updated_user.get("avatar_url")
+        avatar_url=updated_user.get("avatar_url"),
+        role=updated_user.get("role", "Developer")
     )
+
+@app.get("/api/auth/check-handle")
+async def check_handle_availability(handle: str, current_user: dict = Depends(get_current_user)):
+    """Check if a handle is available for use."""
+    if not handle:
+        return {"available": False, "reason": "Empty handle"}
+    
+    clean_handle = handle.strip().lower()
+    if not clean_handle.startswith("@"):
+        clean_handle = f"@{clean_handle}"
+    
+    if len(clean_handle) < 3:
+        return {"available": False, "reason": "Too short"}
+        
+    # Regex check for validity (letters, numbers, underscores)
+    import re
+    if not re.match(r"^@[a-zA-Z0-9_]+$", clean_handle):
+        return {"available": False, "reason": "Invalid characters"}
+
+    # Collision check
+    collision_query = {"handle": {"$regex": f"^{clean_handle}$", "$options": "i"}}
+    existing_user = await db.users.find_one(collision_query)
+    
+    if existing_user and str(existing_user["_id"]) != current_user["id"]:
+        return {"available": False, "reason": "Already taken"}
+        
+    return {"available": True, "handle": clean_handle}
 
 @app.get("/api/users/search")
 async def search_users(q: str, current_user: dict = Depends(get_current_user)):

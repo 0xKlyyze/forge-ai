@@ -50,10 +50,23 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const updateUser = (userData) => {
-    const updatedUser = { ...user, ...userData };
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+  const updateUser = async (userData) => {
+    try {
+      const response = await api.put('/auth/profile', userData);
+      const updatedUserFromBackend = response.data;
+
+      // Merge local state with backend response to be extremely robust against missing fields
+      const mergedUser = { ...user, ...updatedUserFromBackend };
+
+      setUser(mergedUser);
+      localStorage.setItem('user', JSON.stringify(mergedUser));
+      return mergedUser;
+    } catch (error) {
+      console.error("Update profile failed", error);
+      // Fallback to local update for UI responsiveness if desired, 
+      // but here we want to ensure persistence.
+      throw error;
+    }
   };
 
   return (

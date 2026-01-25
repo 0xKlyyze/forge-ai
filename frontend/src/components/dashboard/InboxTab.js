@@ -1,11 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Check, X, Clock, ExternalLink, Shield, User } from 'lucide-react';
+import { Mail, Check, X, Clock, ExternalLink, Shield, User, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 export default function InboxTab({ invites, onAccept, onDecline, isLoading }) {
+    const [processingId, setProcessingId] = useState(null);
+
+    const handleAction = async (token, action, inviteId) => {
+        setProcessingId(`${inviteId}-${action}`);
+        try {
+            if (action === 'accept') {
+                await onAccept(token);
+            } else {
+                await onDecline(token);
+            }
+        } finally {
+            // Note: If success, the item will be removed from list anyway, 
+            // but if error we should clear the loading state.
+            setProcessingId(null);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="space-y-4">
@@ -36,9 +53,10 @@ export default function InboxTab({ invites, onAccept, onDecline, isLoading }) {
                 {invites.map((invite) => (
                     <motion.div
                         key={invite.id}
+                        layout
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
+                        exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
                         className="group relative overflow-hidden rounded-2xl bg-zinc-900/60 border border-white/5 p-6 hover:border-blue-500/30 transition-all duration-300 shadow-xl"
                     >
                         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -78,17 +96,27 @@ export default function InboxTab({ invites, onAccept, onDecline, isLoading }) {
                             {/* Actions */}
                             <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
                                 <Button
-                                    onClick={() => onDecline(invite.token)}
+                                    onClick={() => handleAction(invite.token, 'decline', invite.id)}
                                     variant="ghost"
+                                    disabled={processingId !== null}
                                     className="flex-1 md:flex-none h-11 px-6 rounded-xl border border-white/5 text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
                                 >
-                                    <X size={18} className="mr-2" /> Decline
+                                    {processingId === `${invite.id}-decline` ? (
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <><X size={18} className="mr-2" /> Decline</>
+                                    )}
                                 </Button>
                                 <Button
-                                    onClick={() => onAccept(invite.token)}
+                                    onClick={() => handleAction(invite.token, 'accept', invite.id)}
+                                    disabled={processingId !== null}
                                     className="flex-1 md:flex-none h-11 px-8 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                 >
-                                    <Check size={18} className="mr-2" /> Accept
+                                    {processingId === `${invite.id}-accept` ? (
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <><Check size={18} className="mr-2" /> Accept</>
+                                    )}
                                 </Button>
                             </div>
                         </div>
