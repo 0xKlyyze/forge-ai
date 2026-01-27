@@ -11,9 +11,10 @@ import {
     Sparkles, Send, Globe, FileText, Bot, User, Paperclip, Plus,
     MessageSquare, Trash2, ChevronLeft, Brain, Zap, Leaf, ChevronDown,
     Copy, Check, Clock, ArrowRight, Lightbulb, Pin, Wand2, Upload, X,
-    CheckSquare
+    CheckSquare, Menu, PanelLeft
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
+import { Sheet, SheetContent, SheetTrigger } from '../../components/ui/sheet';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -33,6 +34,19 @@ import remarkGfm from 'remark-gfm';
 
 
 import { cn } from '../../lib/utils';
+
+// Hook to detect mobile viewport
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    return isMobile;
+};
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RICH INPUT COMPONENT - contentEditable for atomic chips
@@ -1992,90 +2006,106 @@ export default function ProjectChat() {
         }, 10); // Slight delay to ensure render
     }, [input]);
 
-    return (
-        <div className="h-full flex bg-background/50 relative">
+    const isMobile = useIsMobile();
 
-            {/* Chat History Sidebar - Hidden in read-only mode */}
-            {!readOnly && (
-                <div className={`
-                ${showSidebar ? 'w-72' : 'w-0'} 
-                flex-shrink-0 border-r border-white/5 bg-black/30 backdrop-blur-sm
-                transition-all duration-300 overflow-hidden
-            `}>
-                    <div className="p-4 h-full flex flex-col w-72">
-                        {/* Sidebar Header */}
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-semibold">Conversations</h3>
-                            <Button
-                                size="sm"
-                                className="h-8 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary"
-                                onClick={createNewSession}
-                            >
-                                <Plus className="h-4 w-4 mr-1" />
-                                New
-                            </Button>
-                        </div>
+    // Session Sidebar Content Component
+    const SessionSidebarContent = () => (
+        <div className="h-full flex flex-col">
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between mb-4 p-4 pb-0">
+                <h3 className="text-sm font-semibold">Conversations</h3>
+                <Button
+                    size="sm"
+                    className="h-8 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary"
+                    onClick={() => {
+                        createNewSession();
+                        // Close sheet on mobile if needed, though usually users want to see the new session immediately
+                    }}
+                >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New
+                </Button>
+            </div>
 
-                        {/* Sessions List */}
-                        <ScrollArea className="flex-1 -mx-2">
-                            <div className="space-y-1 px-2">
-                                {sessions.map(session => (
-                                    <div
-                                        key={session.id}
-                                        onClick={() => loadSession(session.id)}
-                                        className={`
-                                        group flex items-center gap-2 p-2.5 rounded-xl cursor-pointer transition-all
-                                        ${session.id === currentSessionId
-                                                ? 'bg-primary/20 border border-primary/30'
-                                                : 'hover:bg-white/5 border border-transparent'}
-                                        ${session.pinned ? 'ring-1 ring-accent/30' : ''}
-                                    `}
-                                    >
-                                        {/* Icon */}
-                                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${session.id === currentSessionId ? 'bg-primary/30' : 'bg-secondary/50'
-                                            }`}>
-                                            {session.pinned ? (
-                                                <Pin className="h-4 w-4 text-accent fill-accent" />
-                                            ) : (
-                                                <MessageSquare className={`h-4 w-4 ${session.id === currentSessionId ? 'text-primary' : 'text-muted-foreground'}`} />
-                                            )}
-                                        </div>
-
-                                        {/* Title - constrained width */}
-                                        <div className="flex-1 min-w-0 max-w-[120px]">
-                                            <p className="text-sm font-medium truncate">{session.title}</p>
-                                            <p className="text-[10px] text-muted-foreground truncate">
-                                                {formatDistanceToNow(new Date(session.updated_at))} ago
-                                            </p>
-                                        </div>
-
-                                        {/* Actions - always visible space reserved */}
-                                        <div className="flex items-center gap-0.5 flex-shrink-0">
-                                            <button
-                                                onClick={(e) => togglePin(session.id, session.pinned, e)}
-                                                className={`p-1 rounded-md transition-all ${session.pinned
-                                                    ? 'text-accent'
-                                                    : 'opacity-0 group-hover:opacity-100 hover:bg-white/10'
-                                                    }`}
-                                                title={session.pinned ? 'Unpin' : 'Pin'}
-                                            >
-                                                <Pin className={`h-3 w-3 ${session.pinned ? 'fill-current' : ''}`} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setDeleteConfirmSession(session.id); }}
-                                                className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+            {/* Sessions List */}
+            <ScrollArea className="flex-1 -mx-2 px-6">
+                <div className="space-y-1 pb-4">
+                    {sessions.map(session => (
+                        <div
+                            key={session.id}
+                            onClick={() => {
+                                loadSession(session.id);
+                                // Optional: close mobile sheet here if we had access to the state
+                            }}
+                            className={`
+                             group flex items-center gap-2 p-2.5 rounded-xl cursor-pointer transition-all
+                             ${session.id === currentSessionId
+                                    ? 'bg-primary/20 border border-primary/30'
+                                    : 'hover:bg-white/5 border border-transparent'}
+                             ${session.pinned ? 'ring-1 ring-accent/30' : ''}
+                         `}
+                        >
+                            {/* Icon */}
+                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${session.id === currentSessionId ? 'bg-primary/30' : 'bg-secondary/50'
+                                }`}>
+                                {session.pinned ? (
+                                    <Pin className="h-4 w-4 text-accent fill-accent" />
+                                ) : (
+                                    <MessageSquare className={`h-4 w-4 ${session.id === currentSessionId ? 'text-primary' : 'text-muted-foreground'}`} />
+                                )}
                             </div>
-                        </ScrollArea>
+
+                            {/* Title - constrained width */}
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{session.title}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">
+                                    {formatDistanceToNow(new Date(session.updated_at))} ago
+                                </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                                <button
+                                    onClick={(e) => togglePin(session.id, session.pinned, e)}
+                                    className={`p-1 rounded-md transition-all ${session.pinned
+                                        ? 'text-accent'
+                                        : 'opacity-0 group-hover:opacity-100 hover:bg-white/10'
+                                        }`}
+                                    title={session.pinned ? 'Unpin' : 'Pin'}
+                                >
+                                    <Pin className={`h-3 w-3 ${session.pinned ? 'fill-current' : ''}`} />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmSession(session.id); }}
+                                    className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all"
+                                    title="Delete"
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+        </div>
+    );
+
+    return (
+        <div className="h-full flex bg-background/50 relative overflow-hidden">
+
+            {/* Desktop Sidebar */}
+            {!isMobile && !readOnly && (
+                <div className={`
+                    ${showSidebar ? 'w-72' : 'w-0'} 
+                    flex-shrink-0 border-r border-white/5 bg-black/30 backdrop-blur-sm
+                    transition-all duration-300 overflow-hidden
+                `}>
+                    <div className="h-full w-72">
+                        <SessionSidebarContent />
                     </div>
                 </div>
             )}
+
 
             {/* Main Chat Area - Now a horizontal flex container */}
             <div className="flex-1 flex min-w-0 relative">
@@ -2103,9 +2133,35 @@ export default function ProjectChat() {
                         </div>
                     )}
 
+                    {/* Mobile Header */}
+                    {isMobile && !readOnly && (
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-background/60 backdrop-blur-xl sticky top-0 z-40">
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 -ml-2 text-muted-foreground">
+                                        <Menu className="h-5 w-5" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side="left" className="w-[85%] max-w-[320px] p-0 border-r border-white/10 bg-black/90 backdrop-blur-2xl">
+                                    <SessionSidebarContent />
+                                </SheetContent>
+                            </Sheet>
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-sm font-semibold truncate leading-tight">
+                                    {sessions.find(s => s.id === currentSessionId)?.title || "New Chat"}
+                                </h2>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <div className={`h-1.5 w-1.5 rounded-full ${isMobile ? 'bg-green-500' : 'bg-primary'}`}></div>
+                                    Forge AI
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto pb-40" ref={scrollRef}>
-                        <div className={`mx-auto p-4 pt-14 space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) ? 'max-w-2xl' : 'max-w-4xl'}`}>
+                        <div className={`mx-auto p-4 ${isMobile ? 'pt-4 px-3' : 'pt-14'} space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) && !isMobile ? 'max-w-2xl' : 'max-w-4xl'}`}>
                             {/* Welcome State - Only show for authenticated users, not in read-only demo mode */}
                             {messages.length === 0 && !loading && !readOnly && (
                                 <div className="flex flex-col items-center justify-center py-20">
@@ -2355,7 +2411,7 @@ export default function ProjectChat() {
 
 
                     {/* Input Area */}
-                    <div className="px-2 pt-2 pb-24 md:p-4 md:pt-2 md:pb-6">
+                    <div className={`px-2 pt-2 pb-6 md:p-4 md:pt-2 md:pb-6 ${isMobile ? 'pb-safe-area-bottom' : ''}`}>
                         <div className="relative rounded-2xl bg-secondary/50 border border-white/10 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-all">
 
                             {/* Reference Picker Popover */}
@@ -2638,7 +2694,7 @@ export default function ProjectChat() {
             {/* AI Agent Editor Panel - Inline rounded container */}
             {
                 editorPanelOpen && agentFile && (
-                    <div className="w-[450px] flex-shrink-0 p-4 pl-0">
+                    <div className={isMobile ? "fixed inset-0 z-50 w-full bg-background p-0" : "w-[450px] flex-shrink-0 p-4 pl-0"}>
                         <AgentEditorPanel
                             file={agentFile}
                             originalContent={originalContent}
@@ -2671,16 +2727,18 @@ export default function ProjectChat() {
             {
                 mockupPanelOpen && mockupPanelFile && (
                     <div
-                        className="flex-shrink-0 p-4 pl-0 relative"
-                        style={{ width: `${mockupPanelWidth}px` }}
+                        className={isMobile ? "fixed inset-0 z-50 bg-background" : "flex-shrink-0 p-4 pl-0 relative"}
+                        style={{ width: isMobile ? '100%' : `${mockupPanelWidth}px` }}
                     >
-                        {/* Resize Handle */}
-                        <div
-                            onMouseDown={handleResizeMouseDown}
-                            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
-                        >
-                            <div className="absolute left-1 top-1/2 -translate-y-1/2 h-16 w-1 rounded-full bg-white/10 group-hover:bg-violet-500/50 transition-colors" />
-                        </div>
+                        {/* Resize Handle - Desktop only */}
+                        {!isMobile && (
+                            <div
+                                onMouseDown={handleResizeMouseDown}
+                                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+                            >
+                                <div className="absolute left-1 top-1/2 -translate-y-1/2 h-16 w-1 rounded-full bg-white/10 group-hover:bg-violet-500/50 transition-colors" />
+                            </div>
+                        )}
                         <MockupPreviewPanel
                             file={mockupPanelFile}
                             originalContent={mockupOriginalContent}
