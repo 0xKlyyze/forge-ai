@@ -992,27 +992,6 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                                 </div>
                             </div>
                         ) : (
-                        )}
-
-                        {/* Notes Section */}
-                        <TaskNotes
-                            task={task}
-                            onUpdate={onUpdate}
-                            isOverlay={isOverlay}
-                        />
-
-                        {/* Optimized Mobile: Mini-badges next to title */}
-                        {compact && (
-                            <div className="mt-1.5 flex flex-wrap gap-1.5 opacity-80">
-                                <span className={`w-1.5 h-1.5 rounded-full ${task.priority === 'high' ? 'bg-red-500' :
-                                    task.priority === 'medium' ? 'bg-blue-500' : 'bg-slate-500'
-                                    }`} />
-                                <span className="text-[10px] text-muted-foreground uppercase">{task.priority}</span>
-                                {task.importance === 'high' && <span className="text-[10px] text-amber-500">★ High Impact</span>}
-                            </div>
-                        )}
-
-                        {!readOnly && !compact && (
                             <div
                                 onClick={() => !readOnly && onUpdate && setIsEditing(true)}
                                 onPointerDown={(e) => e.stopPropagation()}
@@ -1022,29 +1001,43 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                                     <SmartText text={task.title} className="inline" />
                                 </span>
 
-                                <span className="block mt-1.5 flex flex-wrap gap-1.5">
-                                    <button onClick={cyclePriority} onPointerDown={(e) => e.stopPropagation()} className="inline-flex scale-90 origin-left">
+                                {/* Inline Tags */}
+                                <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
+                                    <button onClick={cyclePriority} onPointerDown={(e) => e.stopPropagation()} title="Priority" className="inline-flex">
                                         <PriorityBadge priority={task.priority} label="P" clickable />
                                     </button>
-                                    <button onClick={cycleImportance} onPointerDown={(e) => e.stopPropagation()} className="inline-flex scale-90 origin-left">
+                                    <button onClick={cycleImportance} onPointerDown={(e) => e.stopPropagation()} title="Importance" className="inline-flex">
                                         <ImportanceBadge importance={task.importance} clickable />
                                     </button>
+                                    {!compact && (
+                                        <button onClick={cycleDifficulty} onPointerDown={(e) => e.stopPropagation()} title="Difficulty" className="inline-flex">
+                                            <DifficultyBadge difficulty={task.difficulty} clickable />
+                                        </button>
+                                    )}
                                 </span>
                             </div>
                         )}
 
-                        {/* Delete - Bigger and more visible */}
-                        {onDelete && !readOnly && (
-                            <button
-                                className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-red-500/0 hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-all"
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                                title="Delete task"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                        )}
+                        {/* Notes Section */}
+                        <TaskNotes
+                            task={task}
+                            onUpdate={onUpdate}
+                            isOverlay={isOverlay}
+                        />
                     </div>
+
+                    {/* Delete */}
+                    {onDelete && !readOnly && (
+                        <button
+                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-red-500/0 hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-all flex-shrink-0"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                            title="Delete task"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
             </CardContent>
         </Card>
     );
