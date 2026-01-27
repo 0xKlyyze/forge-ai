@@ -173,10 +173,19 @@ export function AgentEditorPanel({
     };
 
 
+    // Check for mobile
+    const [isMobile, setIsMobile] = React.useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     return (
-        <div className="h-full flex flex-col bg-[#1e1e1e] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+        <div className={`h-full flex flex-col bg-[#1e1e1e] overflow-hidden shadow-2xl ${isMobile ? 'rounded-none border-0' : 'rounded-2xl border border-white/10'}`}>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/40">
+            <div className={`flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/40 ${isMobile ? 'pt-safe-top' : ''}`}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 border ${isDiffMode
                         ? 'bg-gradient-to-br from-yellow-500/30 to-orange-500/20 border-yellow-500/30'

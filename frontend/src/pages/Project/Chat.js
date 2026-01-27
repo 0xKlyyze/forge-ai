@@ -2056,8 +2056,8 @@ export default function ProjectChat() {
                             </div>
 
                             {/* Title - constrained width */}
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{session.title}</p>
+                            <div className="flex-1 min-w-0 grid gap-0.5">
+                                <p className="text-sm font-medium truncate pr-1">{session.title}</p>
                                 <p className="text-[10px] text-muted-foreground truncate">
                                     {formatDistanceToNow(new Date(session.updated_at))} ago
                                 </p>
@@ -2091,7 +2091,7 @@ export default function ProjectChat() {
     );
 
     return (
-        <div className="h-full flex bg-background/50 relative overflow-hidden">
+        <div className="h-full flex bg-background/50 relative overflow-hidden overflow-x-hidden">
 
             {/* Desktop Sidebar */}
             {!isMobile && !readOnly && (
@@ -2584,6 +2584,17 @@ export default function ProjectChat() {
                                                     </div>
                                                 ))}
                                             </div>
+                                        )}
+
+                                        {/* Backdrop for closing tooltips */}
+                                        {(showModelPicker || showMentionPicker) && (
+                                            <div
+                                                className="fixed inset-0 z-30"
+                                                onClick={() => {
+                                                    setShowModelPicker(false);
+                                                    setShowMentionPicker(false);
+                                                }}
+                                            />
                                         )}
 
                                         {/* Input Row */}
