@@ -188,7 +188,7 @@ export default function ProjectTasks() {
 
     return (
         <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="flex-shrink-0 p-3 md:p-6 lg:px-8 lg:pt-8 pb-3 border-b border-white/5">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -241,10 +241,10 @@ export default function ProjectTasks() {
                 </div>
 
                 {/* Content - Add fade animation for view transitions */}
-                <div className="flex-1 overflow-hidden p-4 md:p-6 lg:p-8 pt-2 md:pt-4">
+                <div className="flex-1 min-h-0 overflow-hidden p-4 md:p-6 lg:p-8 pt-2 md:pt-4">
                     <div key={activeView} className="h-full animate-in fade-in duration-200">
                         {activeView === 'kanban' && (
-                            <div className="flex sm:grid sm:grid-cols-3 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 scrollbar-hide">
+                            <div className="flex sm:grid sm:grid-cols-3 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 no-scrollbar">
                                 <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
                                     <KanbanColumn
                                         id="todo"
@@ -290,7 +290,7 @@ export default function ProjectTasks() {
                         )}
 
                         {activeView === 'matrix' && (
-                            <div className="flex sm:grid sm:grid-cols-2 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 scrollbar-hide">
+                            <div className="flex sm:grid sm:grid-cols-2 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 no-scrollbar">
                                 <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
                                     <MatrixQuadrant
                                         id="q1"
@@ -449,7 +449,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
             </div>
 
             {/* Tasks */}
-            <ScrollArea className="flex-1 p-3">
+            <ScrollArea className="flex-1 min-h-0 p-3">
                 <div className="space-y-2">
                     {/* Drop Zone Indicator - appears at TOP when dragging */}
                     {isDragging ? (
@@ -548,7 +548,7 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col rounded-2xl border transition-all duration-200 min-h-[280px] ${isOver
+            className={`flex flex-col rounded-2xl border transition-all duration-200 h-full min-h-[280px] ${isOver
                 ? `${colorStylesActive[color]} scale-[1.02]`
                 : isDragging
                     ? colorStylesDragging[color]
@@ -591,7 +591,7 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
             </div>
 
             {/* Tasks */}
-            <ScrollArea className="flex-1 p-3">
+            <ScrollArea className="flex-1 min-h-0 p-3">
                 <div className="space-y-2">
                     {/* Drop Zone Indicator - appears at TOP when dragging */}
                     {isDragging ? (
@@ -721,7 +721,7 @@ function ListView({ tasks, onToggle, onDelete, onUpdate, onCreateTask }) {
             </div>
 
             {/* List */}
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
                 <div className="divide-y divide-white/5">
                     {sortedTasks.map(task => (
                         <ListItem
