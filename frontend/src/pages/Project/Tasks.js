@@ -188,7 +188,7 @@ export default function ProjectTasks() {
 
     return (
         <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="h-full flex flex-col overflow-hidden">
+            <div className="h-full flex flex-col">
                 {/* Header */}
                 <div className="flex-shrink-0 p-3 md:p-6 lg:px-8 lg:pt-8 pb-3 border-b border-white/5">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -218,18 +218,22 @@ export default function ProjectTasks() {
                                             left: `calc(${activeIndex * (100 / views.length)}% + 4px)`,
                                         }}
                                     />
-                                    <button
-                                        key={view.id}
-                                        onClick={() => setActiveView(view.id)}
-                                        className={`relative z-10 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${activeView === view.id
-                                            ? 'text-primary-foreground'
-                                            : 'text-muted-foreground hover:text-foreground'
-                                            }`}
-                                    >
-                                        <view.icon className={`h-4 w-4 transition-transform duration-200 ${activeView === view.id ? 'scale-110' : ''}`} />
-                                        <span className="hidden sm:inline">{view.label}</span>
-                                    </button>
-                                    ))}
+                                    {views.map((view, index) => {
+                                        const ViewIcon = view.icon;
+                                        return (
+                                            <button
+                                                key={view.id}
+                                                onClick={() => setActiveView(view.id)}
+                                                className={`relative z-10 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${activeView === view.id
+                                                    ? 'text-primary-foreground'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                                    }`}
+                                            >
+                                                <ViewIcon className={`h-4 w-4 transition-transform duration-200 ${activeView === view.id ? 'scale-110' : ''}`} />
+                                                <span className="hidden sm:inline">{view.label}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             );
                         })()}
@@ -240,95 +244,109 @@ export default function ProjectTasks() {
                 <div className="flex-1 overflow-hidden p-4 md:p-6 lg:p-8 pt-2 md:pt-4">
                     <div key={activeView} className="h-full animate-in fade-in duration-200">
                         {activeView === 'kanban' && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-                                <KanbanColumn
-                                    id="todo"
-                                    title="To Do"
-                                    icon={ListTodo}
-                                    tasks={tasks.filter(t => t.status === 'todo')}
-                                    onCreateTask={(title) => createTask(title, { status: 'todo' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
-                                <KanbanColumn
-                                    id="in-progress"
-                                    title="In Progress"
-                                    icon={Zap}
-                                    accentColor="accent"
-                                    tasks={tasks.filter(t => t.status === 'in-progress')}
-                                    onCreateTask={(title) => createTask(title, { status: 'in-progress' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
-                                <KanbanColumn
-                                    id="done"
-                                    title="Done"
-                                    icon={CheckCircle2}
-                                    accentColor="green"
-                                    tasks={tasks.filter(t => t.status === 'done')}
-                                    onCreateTask={(title) => createTask(title, { status: 'done' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
+                            <div className="flex sm:grid sm:grid-cols-3 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 scrollbar-hide">
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <KanbanColumn
+                                        id="todo"
+                                        title="To Do"
+                                        icon={ListTodo}
+                                        tasks={tasks.filter(t => t.status === 'todo')}
+                                        onCreateTask={(title) => createTask(title, { status: 'todo' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <KanbanColumn
+                                        id="in-progress"
+                                        title="In Progress"
+                                        icon={Zap}
+                                        accentColor="accent"
+                                        tasks={tasks.filter(t => t.status === 'in-progress')}
+                                        onCreateTask={(title) => createTask(title, { status: 'in-progress' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <KanbanColumn
+                                        id="done"
+                                        title="Done"
+                                        icon={CheckCircle2}
+                                        accentColor="green"
+                                        tasks={tasks.filter(t => t.status === 'done')}
+                                        onCreateTask={(title) => createTask(title, { status: 'done' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
                             </div>
                         )}
 
                         {activeView === 'matrix' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-                                <MatrixQuadrant
-                                    id="q1"
-                                    title="Do First"
-                                    subtitle="Urgent & Important"
-                                    color="red"
-                                    tasks={tasks.filter(t => t.quadrant === 'q1' && t.status !== 'done')}
-                                    onCreateTask={(title) => createTask(title, { quadrant: 'q1', priority: 'high', importance: 'high' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
-                                <MatrixQuadrant
-                                    id="q2"
-                                    title="Schedule"
-                                    subtitle="Important, Not Urgent"
-                                    color="blue"
-                                    tasks={tasks.filter(t => t.quadrant === 'q2' && t.status !== 'done')}
-                                    onCreateTask={(title) => createTask(title, { quadrant: 'q2', priority: 'low', importance: 'high' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
-                                <MatrixQuadrant
-                                    id="q3"
-                                    title="Delegate"
-                                    subtitle="Urgent, Not Important"
-                                    color="amber"
-                                    tasks={tasks.filter(t => t.quadrant === 'q3' && t.status !== 'done')}
-                                    onCreateTask={(title) => createTask(title, { quadrant: 'q3', priority: 'high', importance: 'low' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
-                                <MatrixQuadrant
-                                    id="q4"
-                                    title="Eliminate"
-                                    subtitle="Neither Urgent nor Important"
-                                    color="gray"
-                                    tasks={tasks.filter(t => t.quadrant === 'q4' && t.status !== 'done')}
-                                    onCreateTask={(title) => createTask(title, { quadrant: 'q4', priority: 'low', importance: 'low' })}
-                                    onToggle={toggleDone}
-                                    onDelete={deleteTask}
-                                    onUpdate={updateTask}
-                                    isDragging={!!activeId}
-                                />
+                            <div className="flex sm:grid sm:grid-cols-2 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 scrollbar-hide">
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <MatrixQuadrant
+                                        id="q1"
+                                        title="Do First"
+                                        subtitle="Urgent & Important"
+                                        color="red"
+                                        tasks={tasks.filter(t => t.quadrant === 'q1' && t.status !== 'done')}
+                                        onCreateTask={(title) => createTask(title, { quadrant: 'q1', priority: 'high', importance: 'high' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <MatrixQuadrant
+                                        id="q2"
+                                        title="Schedule"
+                                        subtitle="Important, Not Urgent"
+                                        color="blue"
+                                        tasks={tasks.filter(t => t.quadrant === 'q2' && t.status !== 'done')}
+                                        onCreateTask={(title) => createTask(title, { quadrant: 'q2', priority: 'low', importance: 'high' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <MatrixQuadrant
+                                        id="q3"
+                                        title="Delegate"
+                                        subtitle="Urgent, Not Important"
+                                        color="amber"
+                                        tasks={tasks.filter(t => t.quadrant === 'q3' && t.status !== 'done')}
+                                        onCreateTask={(title) => createTask(title, { quadrant: 'q3', priority: 'high', importance: 'low' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
+                                <div className="min-w-[85vw] sm:min-w-0 h-full snap-center flex-shrink-0">
+                                    <MatrixQuadrant
+                                        id="q4"
+                                        title="Eliminate"
+                                        subtitle="Neither Urgent nor Important"
+                                        color="gray"
+                                        tasks={tasks.filter(t => t.quadrant === 'q4' && t.status !== 'done')}
+                                        onCreateTask={(title) => createTask(title, { quadrant: 'q4', priority: 'low', importance: 'low' })}
+                                        onToggle={toggleDone}
+                                        onDelete={deleteTask}
+                                        onUpdate={updateTask}
+                                        isDragging={!!activeId}
+                                    />
+                                </div>
                             </div>
                         )}
 
@@ -758,8 +776,9 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
 
     return (
         <div className={`hover:bg-white/5 transition-colors group ${task.status === 'done' ? 'opacity-50' : ''}`}>
-            <div className="grid grid-cols-12 px-4 py-3 items-start">
-                <div className="col-span-1 pt-0.5">
+            <div className="flex sm:grid sm:grid-cols-12 px-4 py-3 items-start gap-3 sm:gap-0">
+                {/* Checkbox */}
+                <div className="sm:col-span-1 pt-0.5 flex-shrink-0">
                     <button onClick={onToggle} className="p-1">
                         {task.status === 'done'
                             ? <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -767,7 +786,9 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                         }
                     </button>
                 </div>
-                <div className="col-span-5 pr-4">
+
+                {/* Main Content (Title + Chips + Notes) */}
+                <div className="flex-1 sm:col-span-8 md:col-span-9 pr-4 min-w-0">
                     {isEditing ? (
                         <div>
                             <SmartInput
@@ -778,7 +799,7 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                                 className="h-8 text-sm bg-transparent border-white/10 w-full"
                                 autoFocus
                             />
-                            <div className="flex gap-1.5 mt-1.5">
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
                                 <button onClick={cyclePriority} title="Priority"><PriorityBadge priority={task.priority} label="P" clickable /></button>
                                 <button onClick={cycleImportance} title="Importance"><ImportanceBadge importance={task.importance} clickable /></button>
                                 <button onClick={cycleDifficulty} title="Difficulty"><DifficultyBadge difficulty={task.difficulty} clickable /></button>
@@ -790,16 +811,21 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                                 onClick={() => setIsEditing(true)}
                                 className={`text-left text-sm font-medium w-full cursor-text ${task.status === 'done' ? 'line-through' : ''}`}
                             >
-                                <span className="inline">
+                                <div className="break-words mb-1">
                                     <SmartText text={task.title} className="inline" />
-                                </span>
+                                </div>
 
                                 {/* Inline Tags */}
-                                <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
+                                <div className="flex flex-wrap items-center gap-1.5 align-middle">
                                     <button onClick={cyclePriority} title="Priority" className="inline-flex"><PriorityBadge priority={task.priority} label="P" clickable /></button>
                                     <button onClick={cycleImportance} title="Importance" className="inline-flex"><ImportanceBadge importance={task.importance} clickable /></button>
                                     <button onClick={cycleDifficulty} title="Difficulty" className="inline-flex"><DifficultyBadge difficulty={task.difficulty} clickable /></button>
-                                </span>
+
+                                    {/* Status Badge (Desktop inline-ish/Mobile fallback) */}
+                                    <span className={`sm:hidden text-[9px] font-medium uppercase px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground`}>
+                                        {task.status.replace('-', ' ')}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Notes in List View */}
@@ -809,28 +835,9 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                         </div>
                     )}
                 </div>
-                {/* Hide old columns for P/I since they are now inline */}
-                <div className="col-span-2 text-xs text-muted-foreground pt-1.5">
-                    {/* Placeholder to keep grid alignment or maybe just remove these columns? 
-                         User didn't explicitly ask to remove columns, but asked for inline style.
-                         Let's keep the grid structure for now but maybe just empty these cells or show something else.
-                         Actually, let's just leave them as alternative controls or remove them to duplicate?
-                         "move the priority and importance tags to the same line as the task name"
-                         This implies removing the separate columns.
-                         BUT, ListView header still has them.
-                         For now I will duplicate them or just leave blank?
-                         Let's leave them for now to avoid breaking the header alignment, but maybe render nothing?
-                         Or render duplicate?
-                         Let's render duplicate for clarity in this specific view OR just hide.
-                         User said "move to same line". So likely doesn't want them in separate columns.
-                         However, changing the GRID columns requires changing the Header too. I won't touch the header for now to avoid big refactor.
-                         I'll just render nothing in these columns.
-                     */}
-                </div>
-                <div className="col-span-2 pt-1.5">
-                    {/* Empty for Importance */}
-                </div>
-                <div className="col-span-1 pt-1.5">
+
+                {/* Desktop Status Column */}
+                <div className="hidden sm:block sm:col-span-2 pt-1.5">
                     <span className={`text-[10px] font-medium uppercase px-2 py-1 rounded-lg ${task.status === 'todo' ? 'bg-muted text-muted-foreground' :
                         task.status === 'in-progress' ? 'bg-accent/20 text-accent' :
                             'bg-green-500/20 text-green-500'
@@ -838,11 +845,13 @@ function ListItem({ task, onToggle, onDelete, onUpdate }) {
                         {task.status.replace('-', ' ')}
                     </span>
                 </div>
-                <div className="col-span-1 text-right pt-0.5">
+
+                {/* Delete */}
+                <div className="sm:col-span-1 text-right pt-0.5 flex-shrink-0">
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 sm:group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all"
                         onClick={() => onDelete(task.id)}
                     >
                         <Trash2 className="h-4 w-4" />
@@ -964,12 +973,10 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                                 onPointerDown={(e) => e.stopPropagation()}
                                 className={`text-left text-sm font-medium w-full ${!readOnly ? 'cursor-text' : ''} ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
                             >
-                                <span className="inline">
+                                <div className="break-words mb-1.5">
                                     <SmartText text={task.title} className="inline" />
-                                </span>
-
-                                {/* Inline Tags */}
-                                <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
                                     <button
                                         onClick={cyclePriority}
                                         onPointerDown={(e) => e.stopPropagation()}
@@ -994,7 +1001,7 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                                     >
                                         <DifficultyBadge difficulty={task.difficulty} clickable />
                                     </button>
-                                </span>
+                                </div>
                             </div>
                         )}
 
