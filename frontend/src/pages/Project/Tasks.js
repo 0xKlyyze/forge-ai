@@ -1,14 +1,4 @@
-// Hook to detect mobile viewport
-const useIsMobile = () => {
-    const [isMobile, setIsMobile] = useState(false);
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
-    return isMobile;
-};
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -72,7 +62,20 @@ import { useProjectContext } from '../../context/ProjectContext';
 import { useCreateTask, useUpdateTask, useDeleteTask } from '../../hooks/useProjectQueries';
 import { TasksSkeleton } from '../../components/skeletons/PageSkeletons';
 
+// Hook to detect mobile viewport
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    return isMobile;
+};
+
 export default function ProjectTasks() {
+    const isMobile = useIsMobile();
     const { projectId } = useParams();
     const { tasks, isLoadingTasks, readOnly } = useProjectContext();
     const [activeId, setActiveId] = useState(null);
@@ -187,21 +190,13 @@ export default function ProjectTasks() {
         <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="h-full flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className={`flex-shrink-0 border-b border-white/5 bg-background/50 backdrop-blur-sm z-30 sticky top-0 ${useIsMobile() ? 'p-3 pt-safe-top' : 'p-4 md:p-6 lg:px-8 lg:pt-8 pb-4'}`}>
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                            <h1 className={`${useIsMobile() ? 'text-lg' : 'text-2xl'} font-bold tracking-tight truncate`}>Mission Control</h1>
-                            {!useIsMobile() && (
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    <span className="text-primary">{todoCount}</span> todo · <span className="text-accent">{inProgressCount}</span> active · <span className="text-green-500">{doneCount}</span> done
-                                </p>
-                            )}
-                            {useIsMobile() && (
-                                <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-primary" />{todoCount}</span>
-                                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-accent" />{inProgressCount}</span>
-                                </div>
-                            )}
+                <div className="flex-shrink-0 p-3 md:p-6 lg:px-8 lg:pt-8 pb-3 border-b border-white/5">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-bold tracking-tight">Mission Control</h1>
+                            <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                                <span className="text-primary">{todoCount}</span> <span className="hidden xs:inline">to do</span><span className="xs:hidden">do</span> · <span className="text-accent">{inProgressCount}</span> <span className="hidden xs:inline">in progress</span><span className="xs:hidden">prog</span> · <span className="text-green-500">{doneCount}</span> <span className="hidden xs:inline">done</span><span className="xs:hidden">ok</span>
+                            </p>
                         </div>
 
                         {/* View Switcher with animated sliding pill */}
@@ -212,10 +207,9 @@ export default function ProjectTasks() {
                                 { id: 'list', icon: List, label: 'List' }
                             ];
                             const activeIndex = views.findIndex(v => v.id === activeView);
-                            const isMobile = useIsMobile();
 
                             return (
-                                <div className={`relative flex items-center gap-1 bg-secondary/30 rounded-2xl p-1 flex-shrink-0 ${isMobile ? 'scale-90 origin-right' : ''}`}>
+                                <div className="relative flex items-center gap-1 bg-secondary/30 rounded-2xl p-1">
                                     {/* Animated background pill */}
                                     <div
                                         className="absolute h-[calc(100%-8px)] rounded-xl bg-primary shadow-lg transition-all duration-300 ease-out"
@@ -224,19 +218,17 @@ export default function ProjectTasks() {
                                             left: `calc(${activeIndex * (100 / views.length)}% + 4px)`,
                                         }}
                                     />
-                                    {views.map((view, index) => (
-                                        <button
-                                            key={view.id}
-                                            onClick={() => setActiveView(view.id)}
-                                            className={`relative z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${isMobile ? 'flex-1' : ''} ${activeView === view.id
-                                                ? 'text-primary-foreground'
-                                                : 'text-muted-foreground hover:text-foreground'
-                                                }`}
-                                            title={view.label}
-                                        >
-                                            <view.icon className={`h-4 w-4 transition-transform duration-200 ${activeView === view.id ? 'scale-110' : ''}`} />
-                                            {!isMobile && <span className="hidden sm:inline">{view.label}</span>}
-                                        </button>
+                                    <button
+                                        key={view.id}
+                                        onClick={() => setActiveView(view.id)}
+                                        className={`relative z-10 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${activeView === view.id
+                                            ? 'text-primary-foreground'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                    >
+                                        <view.icon className={`h-4 w-4 transition-transform duration-200 ${activeView === view.id ? 'scale-110' : ''}`} />
+                                        <span className="hidden sm:inline">{view.label}</span>
+                                    </button>
                                     ))}
                                 </div>
                             );
@@ -244,124 +236,99 @@ export default function ProjectTasks() {
                     </div>
                 </div>
 
-                {/* Content - Mobile scroll snap container */}
-                <div className={`flex-1 overflow-hidden ${useIsMobile() ? 'pb-20' : 'p-4 md:p-6 lg:p-8 pt-2 md:pt-4'}`}>
+                {/* Content - Add fade animation for view transitions */}
+                <div className="flex-1 overflow-hidden p-4 md:p-6 lg:p-8 pt-2 md:pt-4">
                     <div key={activeView} className="h-full animate-in fade-in duration-200">
                         {activeView === 'kanban' && (
-                            <div className={`h-full ${useIsMobile()
-                                ? 'flex overflow-x-auto snap-x snap-mandatory px-4 gap-4 pb-4 items-start'
-                                : 'grid grid-cols-1 md:grid-cols-3 gap-4'
-                                }`}>
-                                {/* Mobile placeholder for left spacing */}
-                                {useIsMobile() && <div className="w-0 flex-shrink-0" />}
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <KanbanColumn
-                                        id="todo"
-                                        title="To Do"
-                                        icon={ListTodo}
-                                        tasks={tasks.filter(t => t.status === 'todo')}
-                                        onCreateTask={(title) => createTask(title, { status: 'todo' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <KanbanColumn
-                                        id="in-progress"
-                                        title="In Progress"
-                                        icon={Zap}
-                                        accentColor="accent"
-                                        tasks={tasks.filter(t => t.status === 'in-progress')}
-                                        onCreateTask={(title) => createTask(title, { status: 'in-progress' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <KanbanColumn
-                                        id="done"
-                                        title="Done"
-                                        icon={CheckCircle2}
-                                        accentColor="green"
-                                        tasks={tasks.filter(t => t.status === 'done')}
-                                        onCreateTask={(title) => createTask(title, { status: 'done' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                {/* Mobile placeholder for right spacing */}
-                                {useIsMobile() && <div className="w-2 flex-shrink-0" />}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+                                <KanbanColumn
+                                    id="todo"
+                                    title="To Do"
+                                    icon={ListTodo}
+                                    tasks={tasks.filter(t => t.status === 'todo')}
+                                    onCreateTask={(title) => createTask(title, { status: 'todo' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
+                                <KanbanColumn
+                                    id="in-progress"
+                                    title="In Progress"
+                                    icon={Zap}
+                                    accentColor="accent"
+                                    tasks={tasks.filter(t => t.status === 'in-progress')}
+                                    onCreateTask={(title) => createTask(title, { status: 'in-progress' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
+                                <KanbanColumn
+                                    id="done"
+                                    title="Done"
+                                    icon={CheckCircle2}
+                                    accentColor="green"
+                                    tasks={tasks.filter(t => t.status === 'done')}
+                                    onCreateTask={(title) => createTask(title, { status: 'done' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
                             </div>
                         )}
 
                         {activeView === 'matrix' && (
-                            <div className={`h-full ${useIsMobile()
-                                ? 'flex overflow-x-auto snap-x snap-mandatory px-4 gap-4 pb-4 items-start'
-                                : 'grid grid-cols-1 md:grid-cols-2 gap-4'
-                                }`}>
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <MatrixQuadrant
-                                        id="q1"
-                                        title="Do First"
-                                        subtitle="Urgent & Important"
-                                        color="red"
-                                        tasks={tasks.filter(t => t.quadrant === 'q1' && t.status !== 'done')}
-                                        onCreateTask={(title) => createTask(title, { quadrant: 'q1', priority: 'high', importance: 'high' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <MatrixQuadrant
-                                        id="q2"
-                                        title="Schedule"
-                                        subtitle="Important, Not Urgent"
-                                        color="blue"
-                                        tasks={tasks.filter(t => t.quadrant === 'q2' && t.status !== 'done')}
-                                        onCreateTask={(title) => createTask(title, { quadrant: 'q2', priority: 'low', importance: 'high' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <MatrixQuadrant
-                                        id="q3"
-                                        title="Delegate"
-                                        subtitle="Urgent, Not Important"
-                                        color="amber"
-                                        tasks={tasks.filter(t => t.quadrant === 'q3' && t.status !== 'done')}
-                                        onCreateTask={(title) => createTask(title, { quadrant: 'q3', priority: 'high', importance: 'low' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                <div className={`${useIsMobile() ? 'min-w-[85vw] snap-center h-full' : 'h-full'}`}>
-                                    <MatrixQuadrant
-                                        id="q4"
-                                        title="Eliminate"
-                                        subtitle="Neither Urgent nor Important"
-                                        color="gray"
-                                        tasks={tasks.filter(t => t.quadrant === 'q4' && t.status !== 'done')}
-                                        onCreateTask={(title) => createTask(title, { quadrant: 'q4', priority: 'low', importance: 'low' })}
-                                        onToggle={toggleDone}
-                                        onDelete={deleteTask}
-                                        onUpdate={updateTask}
-                                        isDragging={!!activeId}
-                                    />
-                                </div>
-                                {useIsMobile() && <div className="w-2 flex-shrink-0" />}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                                <MatrixQuadrant
+                                    id="q1"
+                                    title="Do First"
+                                    subtitle="Urgent & Important"
+                                    color="red"
+                                    tasks={tasks.filter(t => t.quadrant === 'q1' && t.status !== 'done')}
+                                    onCreateTask={(title) => createTask(title, { quadrant: 'q1', priority: 'high', importance: 'high' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
+                                <MatrixQuadrant
+                                    id="q2"
+                                    title="Schedule"
+                                    subtitle="Important, Not Urgent"
+                                    color="blue"
+                                    tasks={tasks.filter(t => t.quadrant === 'q2' && t.status !== 'done')}
+                                    onCreateTask={(title) => createTask(title, { quadrant: 'q2', priority: 'low', importance: 'high' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
+                                <MatrixQuadrant
+                                    id="q3"
+                                    title="Delegate"
+                                    subtitle="Urgent, Not Important"
+                                    color="amber"
+                                    tasks={tasks.filter(t => t.quadrant === 'q3' && t.status !== 'done')}
+                                    onCreateTask={(title) => createTask(title, { quadrant: 'q3', priority: 'high', importance: 'low' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
+                                <MatrixQuadrant
+                                    id="q4"
+                                    title="Eliminate"
+                                    subtitle="Neither Urgent nor Important"
+                                    color="gray"
+                                    tasks={tasks.filter(t => t.quadrant === 'q4' && t.status !== 'done')}
+                                    onCreateTask={(title) => createTask(title, { quadrant: 'q4', priority: 'low', importance: 'low' })}
+                                    onToggle={toggleDone}
+                                    onDelete={deleteTask}
+                                    onUpdate={updateTask}
+                                    isDragging={!!activeId}
+                                />
                             </div>
                         )}
 
@@ -420,7 +387,7 @@ function KanbanColumn({ id, title, icon: Icon, accentColor = 'primary', tasks, o
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col rounded-2xl bg-secondary/20 border transition-all duration-200 h-full overflow-hidden w-full ${isOver
+            className={`flex flex-col rounded-2xl bg-secondary/20 border transition-all duration-200 h-full overflow-hidden ${isOver
                 ? 'border-primary ring-2 ring-primary/30 bg-primary/10 scale-[1.02]'
                 : isDragging
                     ? 'border-primary/30 border-dashed'
@@ -563,7 +530,7 @@ function MatrixQuadrant({ id, title, subtitle, color, tasks, onCreateTask, onTog
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col rounded-2xl border transition-all duration-200 min-h-[280px] h-full w-full ${isOver
+            className={`flex flex-col rounded-2xl border transition-all duration-200 min-h-[280px] ${isOver
                 ? `${colorStylesActive[color]} scale-[1.02]`
                 : isDragging
                     ? colorStylesDragging[color]
@@ -1003,17 +970,30 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
 
                                 {/* Inline Tags */}
                                 <span className="inline-flex items-center gap-1.5 ml-2 align-middle translate-y-[-1px]">
-                                    <button onClick={cyclePriority} onPointerDown={(e) => e.stopPropagation()} title="Priority" className="inline-flex">
+                                    <button
+                                        onClick={cyclePriority}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        title="Click to change priority"
+                                        className="inline-flex"
+                                    >
                                         <PriorityBadge priority={task.priority} label="P" clickable />
                                     </button>
-                                    <button onClick={cycleImportance} onPointerDown={(e) => e.stopPropagation()} title="Importance" className="inline-flex">
+                                    <button
+                                        onClick={cycleImportance}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        title="Click to change importance"
+                                        className="inline-flex"
+                                    >
                                         <ImportanceBadge importance={task.importance} clickable />
                                     </button>
-                                    {!compact && (
-                                        <button onClick={cycleDifficulty} onPointerDown={(e) => e.stopPropagation()} title="Difficulty" className="inline-flex">
-                                            <DifficultyBadge difficulty={task.difficulty} clickable />
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={cycleDifficulty}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        title="Click to change difficulty"
+                                        className="inline-flex"
+                                    >
+                                        <DifficultyBadge difficulty={task.difficulty} clickable />
+                                    </button>
                                 </span>
                             </div>
                         )}
@@ -1024,12 +1004,21 @@ function TaskCard({ task, onToggle, onDelete, onUpdate, isOverlay, compact }) {
                             onUpdate={onUpdate}
                             isOverlay={isOverlay}
                         />
+
+                        {!compact && (
+                            /* Quick Priority & Importance Toggles - Only show in full view if needed, or keep them? 
+                               User asked for "notes and smart references". 
+                               The code I see in line 733 in previous view showed TaskNotes inside !compact.
+                               Let's just remove the condition.
+                            */
+                            null
+                        )}
                     </div>
 
-                    {/* Delete */}
+                    {/* Delete - Bigger and more visible */}
                     {onDelete && !readOnly && (
                         <button
-                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-red-500/0 hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-all flex-shrink-0"
+                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-red-500/0 hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-all"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); onDelete(); }}
                             title="Delete task"
