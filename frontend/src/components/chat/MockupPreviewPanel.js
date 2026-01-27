@@ -230,20 +230,20 @@ export function MockupPreviewPanel({
                             )}
                         </h3>
                         <div className="flex items-center gap-2 text-xs">
-                            <span className="px-1.5 py-0.5 rounded-md border bg-violet-500/20 text-violet-400 border-violet-500/30">
+                            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded-md border bg-violet-500/20 text-violet-400 border-violet-500/30">
                                 Mockup
                             </span>
                             {isDiffMode ? (
-                                <span className="text-yellow-400/70 truncate max-w-[200px]">
+                                <span className="text-yellow-400/70 truncate max-w-[150px] sm:max-w-[200px]">
                                     {editSummary}
                                 </span>
                             ) : isSaving ? (
-                                <span className="text-muted-foreground flex items-center gap-1">
+                                <span className="text-muted-foreground flex items-center gap-1 hidden sm:flex">
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                     Saving...
                                 </span>
                             ) : (
-                                <span className="text-green-400/70 flex items-center gap-1">
+                                <span className="text-green-400/70 flex items-center gap-1 hidden sm:flex">
                                     <Check className="h-3 w-3" />
                                     Saved
                                 </span>

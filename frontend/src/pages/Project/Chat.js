@@ -2135,7 +2135,7 @@ export default function ProjectChat() {
 
                     {/* Mobile Header */}
                     {isMobile && !readOnly && (
-                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-background/60 backdrop-blur-xl sticky top-0 z-40">
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-background/60 backdrop-blur-xl sticky top-0 z-40 h-16">
                             <Sheet>
                                 <SheetTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-9 w-9 -ml-2 text-muted-foreground">
@@ -2158,10 +2158,9 @@ export default function ProjectChat() {
                         </div>
                     )}
 
-
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto pb-40" ref={scrollRef}>
-                        <div className={`mx-auto p-4 ${isMobile ? 'pt-4 px-3' : 'pt-14'} space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) && !isMobile ? 'max-w-2xl' : 'max-w-4xl'}`}>
+                    <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+                        <div className={`mx-auto p-4 ${isMobile ? 'pt-4 px-3 pb-32' : 'pt-14 pb-40'} space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) && !isMobile ? 'max-w-2xl' : 'max-w-4xl'}`}>
                             {/* Welcome State - Only show for authenticated users, not in read-only demo mode */}
                             {messages.length === 0 && !loading && !readOnly && (
                                 <div className="flex flex-col items-center justify-center py-20">
@@ -2411,8 +2410,8 @@ export default function ProjectChat() {
 
 
                     {/* Input Area */}
-                    <div className={`px-2 pt-2 pb-6 md:p-4 md:pt-2 md:pb-6 ${isMobile ? 'pb-safe-area-bottom' : ''}`}>
-                        <div className="relative rounded-2xl bg-secondary/50 border border-white/10 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-all">
+                    <div className={`px-2 pt-2 md:p-4 md:pt-2 md:pb-6 ${isMobile ? 'pb-24 fixed bottom-0 left-0 right-0 z-30 bg-background/80 backdrop-blur-md' : 'pb-6'}`}>
+                        <div className={`relative rounded-2xl bg-secondary/50 border border-white/10 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-all ${isMobile ? 'mx-2 shadow-2xl' : ''}`}>
 
                             {/* Reference Picker Popover */}
                             {showMentionPicker && (
@@ -2877,10 +2876,11 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
             )}
 
             <div className={`
-                max-w-[75%] rounded-2xl p-4 text-sm leading-relaxed
+                rounded-2xl p-4 text-sm leading-relaxed
                 ${isUser
                     ? 'bg-primary text-primary-foreground rounded-tr-md'
                     : 'bg-secondary/40 border border-white/5 rounded-tl-md backdrop-blur-md'}
+                max-w-[85%] md:max-w-[75%]
             `}>
                 {/* Attachments Display - Images and Files */}
                 {isUser && message.attachments && message.attachments.length > 0 && (

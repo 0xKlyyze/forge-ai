@@ -366,29 +366,39 @@ export function CreatedDocumentCard({ file, onOpen, onOpenInEditor }) {
 
     return (
         <div className={`mt-3 p-3 rounded-xl bg-gradient-to-r ${getCategoryColor()} border backdrop-blur-sm`}>
-            <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
-                    <FileText className="h-5 w-5 text-primary" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30 flex-shrink-0">
+                        <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 sm:hidden">
+                        <p className="text-sm font-semibold truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {file.category}
+                        </p>
+                    </div>
                 </div>
-                <div className="flex-1 min-w-0">
+
+                <div className="flex-1 min-w-0 hidden sm:block">
                     <p className="text-sm font-semibold truncate">{file.name}</p>
                     <p className="text-xs text-muted-foreground">
                         Created in {file.category} • Click to edit
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={onOpen}
-                        className="h-8 px-3 rounded-lg hover:bg-white/10 text-xs"
+                        className="h-8 px-3 rounded-lg hover:bg-white/10 text-xs flex-1 sm:flex-none"
                     >
-                        Edit Here
+                        Edit
                     </Button>
                     <Button
                         size="sm"
                         onClick={onOpenInEditor}
-                        className="h-8 px-3 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs"
+                        className="h-8 px-3 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs flex-1 sm:flex-none"
                     >
                         <ExternalLink className="h-3 w-3 mr-1" />
                         Open
@@ -468,19 +478,21 @@ export function EditedDocumentCard({
                     <FileEdit className="h-5 w-5 text-yellow-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate max-w-[180px]">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                        <p className="text-sm font-semibold truncate max-w-full sm:max-w-[180px]">
                             {file.name}
                         </p>
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 whitespace-nowrap">
-                            {getEditTypeLabel()}
-                        </span>
-                        {isAccepted && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium whitespace-nowrap">
-                                <Check className="h-3 w-3" />
-                                Applied
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 whitespace-nowrap w-fit">
+                                {getEditTypeLabel()}
                             </span>
-                        )}
+                            {isAccepted && (
+                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium whitespace-nowrap w-fit">
+                                    <Check className="h-3 w-3" />
+                                    Applied
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {editSummary || 'Click to review changes'}
@@ -489,7 +501,7 @@ export function EditedDocumentCard({
             </div>
 
             {/* Action buttons - separate row for cleaner layout */}
-            <div className="flex items-center gap-2 mt-2 ml-[52px]">
+            <div className="flex items-center gap-2 mt-3 ml-0 sm:ml-[52px]">
                 {onViewDiff && (
                     <div className="relative group">
                         <Button
@@ -569,22 +581,30 @@ export function CreatedMockupCard({ file, onOpen, onOpenInEditor }) {
 
     return (
         <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-violet-500/20 to-purple-600/10 border border-violet-500/30 backdrop-blur-sm">
-            <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
-                    <Palette className="h-5 w-5 text-violet-400" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center border border-violet-500/30 flex-shrink-0">
+                        <Palette className="h-5 w-5 text-violet-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 sm:hidden">
+                        <p className="text-sm font-semibold truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">Mockup</p>
+                    </div>
                 </div>
-                <div className="flex-1 min-w-0">
+
+                <div className="flex-1 min-w-0 hidden sm:block">
                     <p className="text-sm font-semibold truncate">{file.name}</p>
                     <p className="text-xs text-muted-foreground">
                         Created in Mockups • Click to preview
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={onOpen}
-                        className="h-8 px-3 rounded-lg hover:bg-white/10 text-xs"
+                        className="h-8 px-3 rounded-lg hover:bg-white/10 text-xs flex-1 sm:flex-none"
                     >
                         <Eye className="h-3 w-3 mr-1" />
                         Preview
@@ -592,7 +612,7 @@ export function CreatedMockupCard({ file, onOpen, onOpenInEditor }) {
                     <Button
                         size="sm"
                         onClick={onOpenInEditor}
-                        className="h-8 px-3 rounded-lg bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 text-xs"
+                        className="h-8 px-3 rounded-lg bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 text-xs flex-1 sm:flex-none"
                     >
                         <ExternalLink className="h-3 w-3 mr-1" />
                         Open
@@ -672,19 +692,21 @@ export function EditedMockupCard({
                     <Palette className="h-5 w-5 text-violet-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate max-w-[180px]">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                        <p className="text-sm font-semibold truncate max-w-full sm:max-w-[180px]">
                             {file.name}
                         </p>
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-400 border border-violet-500/30 whitespace-nowrap">
-                            {getEditTypeLabel()}
-                        </span>
-                        {isAccepted && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium whitespace-nowrap">
-                                <Check className="h-3 w-3" />
-                                Applied
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-400 border border-violet-500/30 whitespace-nowrap w-fit">
+                                {getEditTypeLabel()}
                             </span>
-                        )}
+                            {isAccepted && (
+                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium whitespace-nowrap w-fit">
+                                    <Check className="h-3 w-3" />
+                                    Applied
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {editSummary || 'Click to preview changes'}
@@ -693,7 +715,7 @@ export function EditedMockupCard({
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-2 mt-2 ml-[52px]">
+            <div className="flex items-center gap-2 mt-3 ml-0 sm:ml-[52px]">
                 {onViewDiff && (
                     <div className="relative group">
                         <Button
