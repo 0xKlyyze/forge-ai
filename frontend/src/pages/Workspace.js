@@ -45,6 +45,8 @@ export default function Workspace() {
   const [project, setProject] = useState(null);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const editorRef = useRef(null);
+  const pendingScrollLine = useRef(null);
 
   // Update mobile view when activeFile changes
   useEffect(() => {
@@ -205,6 +207,13 @@ export default function Workspace() {
     saveContent(activeFile.id, newContent);
   };
 
+  const handleSyncEditor = (lineNumber) => {
+    if (editorRef.current) {
+      // 0 = Smooth, 1 = Immediate
+      editorRef.current.revealLineInCenter(lineNumber, 0);
+    }
+  };
+
   const handleFileSelect = (file) => {
     setActiveFile(file);
     // Save to localStorage for session persistence
@@ -349,13 +358,14 @@ export default function Workspace() {
           )}
           {mobileView === 'editor' && activeFile && (
             <Editor
+              ref={editorRef}
               file={activeFile}
               onChange={handleContentChange}
               readOnly={readOnly}
             />
           )}
           {mobileView === 'preview' && activeFile && (
-            <Preview file={activeFile} projectId={projectId} />
+            <Preview file={activeFile} projectId={projectId} onSyncEditor={handleSyncEditor} />
           )}
           {!activeFile && mobileView !== 'files' && (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -470,6 +480,7 @@ export default function Workspace() {
           <ResizablePanel defaultSize={41}>
             {activeFile ? (
               <Editor
+                ref={editorRef}
                 file={activeFile}
                 onChange={handleContentChange}
                 readOnly={readOnly}
@@ -486,7 +497,7 @@ export default function Workspace() {
           {/* Preview Panel */}
           <ResizablePanel defaultSize={41} className="border-l border-white/5">
             {activeFile ? (
-              <Preview file={activeFile} projectId={projectId} />
+              <Preview file={activeFile} projectId={projectId} onSyncEditor={handleSyncEditor} />
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground font-mono text-sm bg-[#0a0a0a]">
                 Preview offline

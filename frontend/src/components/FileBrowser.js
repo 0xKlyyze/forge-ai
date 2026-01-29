@@ -369,13 +369,13 @@ export default function FileBrowser({
                     </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="pb-0">
-                  <div className="flex flex-col">
+                <AccordionContent className="pb-0 overflow-hidden">
+                  <div className="flex flex-col w-full max-w-full">
                     {categoryFiles.map(file => (
                       <div
                         key={file.id}
                         className={`
-                                                    group flex items-center gap-2 px-4 py-1.5 text-sm cursor-pointer border-l-2 w-full max-w-full
+                                                    group flex items-center gap-2 px-4 py-1.5 text-sm cursor-pointer border-l-2 w-full max-w-full min-w-0 overflow-hidden
                                                     ${activeFile?.id === file.id
                             ? 'bg-primary/10 border-primary text-primary'
                             : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -401,7 +401,7 @@ export default function FileBrowser({
                             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={cancelRename}><X className="h-3 w-3 text-red-500" /></Button>
                           </div>
                         ) : (
-                          <span className="flex-1 truncate min-w-0 block">{file.name}</span>
+                          <span className="flex-1 truncate min-w-0 block" title={file.name}>{file.name}</span>
                         )}
 
                         {/* Quick actions */}

@@ -102,6 +102,10 @@ export default function ProjectCard({ project, onDelete }) {
             img.src = project.icon;
 
             img.onload = () => {
+                // Defensive check to prevent "Cannot read properties of null (reading 'style')"
+                // which can occur in some ColorThief implementations or if the image state is invalid
+                if (!img || img.width === 0 || img.height === 0) return;
+                
                 try {
                     const colorThief = new ColorThief();
                     const [r, g, b] = colorThief.getColor(img);

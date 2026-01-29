@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, Component } from 'react';
+import React, { useState, useRef, useEffect, Component, forwardRef, useImperativeHandle } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
@@ -91,11 +91,21 @@ const getLanguageFromFilename = (filename) => {
   return languageMap[ext] || 'plaintext';
 };
 
-export default function FileEditor({ file, onChange, onAddToChat, readOnly }) {
+const FileEditor = forwardRef(({ file, onChange, onAddToChat, readOnly }, ref) => {
   const language = getLanguageFromFilename(file.name);
 
   const editorRef = useRef(null);
   const containerRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    revealLineInCenter: (lineNumber, scrollType) => {
+      if (editorRef.current) {
+        editorRef.current.revealLineInCenter(lineNumber, scrollType);
+        editorRef.current.setPosition({ lineNumber, column: 1 });
+        editorRef.current.focus();
+      }
+    }
+  }));
   const [showAIPopup, setShowAIPopup] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0, showAbove: true });
   const [selectedText, setSelectedText] = useState('');
@@ -466,4 +476,7 @@ export default function FileEditor({ file, onChange, onAddToChat, readOnly }) {
       )}
     </div>
   );
-}
+});
+
+export default FileEditor;
+
