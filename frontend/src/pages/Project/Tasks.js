@@ -240,10 +240,10 @@ export default function ProjectTasks() {
                 </div>
 
                 {/* Content - Add fade animation for view transitions */}
-                <div className="flex-1 min-h-0 overflow-hidden p-4 md:p-6 lg:p-8 pt-2 md:pt-4 pb-20 md:pb-6 lg:pb-8">
+                <div className="flex-1 min-h-0 overflow-hidden px-0 sm:px-4 md:px-6 lg:px-8 pt-2 md:pt-4 pb-20 md:pb-6 lg:pb-8">
                     <div key={activeView} className="h-full animate-in fade-in duration-200">
                         {activeView === 'kanban' && (
-                            <div className="flex sm:grid sm:grid-cols-3 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 no-scrollbar touch-pan-x">
+                            <div className="flex sm:grid sm:grid-cols-3 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory px-4 sm:px-0 pb-4 no-scrollbar touch-pan-x">
                                 <div className="w-[85vw] max-w-[85vw] sm:w-auto sm:max-w-none sm:min-w-0 h-full snap-center flex-shrink-0">
                                     <KanbanColumn
                                         id="todo"
@@ -289,7 +289,7 @@ export default function ProjectTasks() {
                         )}
 
                         {activeView === 'matrix' && (
-                            <div className="flex sm:grid sm:grid-cols-2 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory pb-4 no-scrollbar touch-pan-x">
+                            <div className="flex sm:grid sm:grid-cols-2 gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory px-4 sm:px-0 pb-4 no-scrollbar touch-pan-x">
                                 <div className="w-[85vw] max-w-[85vw] sm:w-auto sm:max-w-none sm:min-w-0 h-full snap-center flex-shrink-0">
                                     <MatrixQuadrant
                                         id="q1"

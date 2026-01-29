@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -27,9 +27,22 @@ const isXmlFile = (filename) => {
     return ['xml', 'svg', 'xsl', 'xslt', 'xsd', 'plist', 'config'].includes(ext);
 };
 
+// Hook to detect mobile viewport
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    return isMobile;
+};
+
 export default function ProjectFiles() {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const isMobile = useIsMobile();
 
     // Use shared context data
     const { project, files, isLoadingFiles, readOnly, baseUrl } = useProjectContext();
@@ -284,157 +297,248 @@ export default function ProjectFiles() {
 
             <div className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 overflow-hidden">
                 {/* Header */}
-                <div className="flex-shrink-0 pb-6 border-b border-white/5">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Files</h1>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                <span className="text-primary">{files.length}</span> artifacts · <span className="text-accent">{files.filter(f => f.pinned).length}</span> pinned
-                            </p>
-                        </div>
+                <div className={`flex-shrink-0 border-b border-white/5 ${isMobile ? 'pb-4' : 'pb-6'}`}>
+                    {isMobile ? (
+                        <div className="flex flex-col gap-3">
+                            {/* Mobile Top Row: Title + Actions */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-xl font-bold tracking-tight">Files</h1>
+                                    <p className="text-xs text-muted-foreground">
+                                        <span className="text-primary">{files.length}</span> items
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {chatFilesCount > 0 && (
+                                        <button
+                                            onClick={() => setShowChatFiles(!showChatFiles)}
+                                            className={`h-8 w-8 rounded-full flex items-center justify-center transition-all border ${showChatFiles
+                                                ? 'bg-accent/20 border-accent/40 text-accent'
+                                                : 'bg-secondary/30 border-white/10 text-muted-foreground'
+                                                }`}
+                                        >
+                                            <Bot className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                    {!readOnly && (
+                                        <Button size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsDialogOpen(true)}>
+                                            <Plus className="h-5 w-5" />
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
 
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Select value={filterType} onValueChange={setFilterType}>
-                                <SelectTrigger className="w-[110px] h-9 rounded-xl bg-secondary/30 border-white/10">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">All</SelectItem>
-                                    <SelectItem value="Docs">Docs</SelectItem>
-                                    <SelectItem value="Mockups">Mockups</SelectItem>
-                                    <SelectItem value="Assets">Assets</SelectItem>
-                                    {(project?.custom_categories || []).map(cat => (
-                                        <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Tag filter */}
-                            {allTags.length > 0 && (
-                                <Select value={filterTag} onValueChange={setFilterTag}>
-                                    <SelectTrigger className="w-[110px] h-9 rounded-xl bg-secondary/30 border-white/10">
-                                        <Tag className="h-3 w-3 mr-1" />
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="All">All Tags</SelectItem>
-                                        {allTags.map(tag => (
-                                            <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-
+                            {/* Mobile Search */}
                             <div className="relative">
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search..."
-                                    className="pl-9 h-9 w-[180px] bg-secondary/30 border-white/10 rounded-xl"
+                                    placeholder="Search files..."
+                                    className="pl-9 h-10 w-full bg-secondary/30 border-white/10 rounded-xl"
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                 />
                             </div>
 
-                            {/* View Toggle */}
-                            <div className="flex items-center bg-secondary/30 rounded-xl p-1">
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                                >
-                                    <LayoutGrid className="h-4 w-4" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                                >
-                                    <ListIcon className="h-4 w-4" />
-                                </button>
+                            {/* Mobile Filters Scroll */}
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+                                <Select value={filterType} onValueChange={setFilterType}>
+                                    <SelectTrigger className="w-[110px] h-9 rounded-xl bg-secondary/30 border-white/10 flex-shrink-0">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="All">All Types</SelectItem>
+                                        <SelectItem value="Docs">Docs</SelectItem>
+                                        <SelectItem value="Mockups">Mockups</SelectItem>
+                                        <SelectItem value="Assets">Assets</SelectItem>
+                                        {(project?.custom_categories || []).map(cat => (
+                                            <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {allTags.length > 0 && (
+                                    <Select value={filterTag} onValueChange={setFilterTag}>
+                                        <SelectTrigger className="w-[110px] h-9 rounded-xl bg-secondary/30 border-white/10 flex-shrink-0">
+                                            <Tag className="h-3 w-3 mr-1" />
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="All">All Tags</SelectItem>
+                                            {allTags.map(tag => (
+                                                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+
+                                <div className="flex items-center bg-secondary/30 rounded-xl p-1 flex-shrink-0 ml-auto">
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                                    >
+                                        <LayoutGrid className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('list')}
+                                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                                    >
+                                        <ListIcon className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold tracking-tight">Files</h1>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    <span className="text-primary">{files.length}</span> artifacts · <span className="text-accent">{files.filter(f => f.pinned).length}</span> pinned
+                                </p>
                             </div>
 
-                            {/* Show Chat Files Toggle */}
-                            {chatFilesCount > 0 && (
-                                <button
-                                    onClick={() => setShowChatFiles(!showChatFiles)}
-                                    className={`h-9 px-3 rounded-xl flex items-center gap-1.5 text-xs font-medium transition-all border ${showChatFiles
-                                        ? 'bg-accent/20 border-accent/40 text-accent'
-                                        : 'bg-secondary/30 border-white/10 text-muted-foreground hover:text-foreground'
-                                        }`}
-                                    title={showChatFiles ? 'Hide AI chat files' : 'Show AI chat files'}
-                                >
-                                    <Bot className="h-3.5 w-3.5" />
-                                    <span>{chatFilesCount} chat</span>
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Select value={filterType} onValueChange={setFilterType}>
+                                    <SelectTrigger className="w-[110px] h-9 rounded-xl bg-secondary/30 border-white/10">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="All">All</SelectItem>
+                                        <SelectItem value="Docs">Docs</SelectItem>
+                                        <SelectItem value="Mockups">Mockups</SelectItem>
+                                        <SelectItem value="Assets">Assets</SelectItem>
+                                        {(project?.custom_categories || []).map(cat => (
+                                            <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                            {!readOnly && (
-                                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button className="h-9 rounded-xl">
-                                            <Plus className="mr-2 h-4 w-4" /> New
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="rounded-2xl">
-                                        <DialogHeader><DialogTitle>Create File</DialogTitle></DialogHeader>
-                                        <Tabs defaultValue="blank" className="w-full">
-                                            <TabsList className="grid w-full grid-cols-2 rounded-xl">
-                                                <TabsTrigger value="blank" className="rounded-lg">Create Blank</TabsTrigger>
-                                                <TabsTrigger value="upload" className="rounded-lg">Upload</TabsTrigger>
-                                            </TabsList>
-                                            <form onSubmit={handleCreateFile} className="mt-4 space-y-4">
-                                                <TabsContent value="blank" className="space-y-4">
-                                                    <Input
-                                                        placeholder="filename.md"
-                                                        value={newFileName}
-                                                        onChange={e => setNewFileName(e.target.value)}
-                                                        className="rounded-xl"
-                                                    />
-                                                </TabsContent>
-                                                <TabsContent value="upload" className="space-y-4">
-                                                    <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-primary/30 transition-colors">
+                                {/* Tag filter */}
+                                {allTags.length > 0 && (
+                                    <Select value={filterTag} onValueChange={setFilterTag}>
+                                        <SelectTrigger className="w-[110px] h-9 rounded-xl bg-secondary/30 border-white/10">
+                                            <Tag className="h-3 w-3 mr-1" />
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="All">All Tags</SelectItem>
+                                            {allTags.map(tag => (
+                                                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search..."
+                                        className="pl-9 h-9 w-[180px] bg-secondary/30 border-white/10 rounded-xl"
+                                        value={search}
+                                        onChange={e => setSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* View Toggle */}
+                                <div className="flex items-center bg-secondary/30 rounded-xl p-1">
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                    >
+                                        <LayoutGrid className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('list')}
+                                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                    >
+                                        <ListIcon className="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                {/* Show Chat Files Toggle */}
+                                {chatFilesCount > 0 && (
+                                    <button
+                                        onClick={() => setShowChatFiles(!showChatFiles)}
+                                        className={`h-9 px-3 rounded-xl flex items-center gap-1.5 text-xs font-medium transition-all border ${showChatFiles
+                                            ? 'bg-accent/20 border-accent/40 text-accent'
+                                            : 'bg-secondary/30 border-white/10 text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        title={showChatFiles ? 'Hide AI chat files' : 'Show AI chat files'}
+                                    >
+                                        <Bot className="h-3.5 w-3.5" />
+                                        <span>{chatFilesCount} chat</span>
+                                    </button>
+                                )}
+
+                                {!readOnly && (
+                                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button className="h-9 rounded-xl">
+                                                <Plus className="mr-2 h-4 w-4" /> New
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="rounded-2xl">
+                                            <DialogHeader><DialogTitle>Create File</DialogTitle></DialogHeader>
+                                            <Tabs defaultValue="blank" className="w-full">
+                                                <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                                                    <TabsTrigger value="blank" className="rounded-lg">Create Blank</TabsTrigger>
+                                                    <TabsTrigger value="upload" className="rounded-lg">Upload</TabsTrigger>
+                                                </TabsList>
+                                                <form onSubmit={handleCreateFile} className="mt-4 space-y-4">
+                                                    <TabsContent value="blank" className="space-y-4">
                                                         <Input
-                                                            type="file"
-                                                            className="hidden"
-                                                            id="file-upload"
-                                                            onChange={(e) => {
-                                                                const file = e.target.files[0];
-                                                                if (file) { setUploadFile(file); setNewFileName(file.name); }
-                                                            }}
+                                                            placeholder="filename.md"
+                                                            value={newFileName}
+                                                            onChange={e => setNewFileName(e.target.value)}
+                                                            className="rounded-xl"
                                                         />
-                                                        <label htmlFor="file-upload" className="cursor-pointer">
-                                                            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {uploadFile ? uploadFile.name : 'Click to select file'}
-                                                            </p>
-                                                        </label>
+                                                    </TabsContent>
+                                                    <TabsContent value="upload" className="space-y-4">
+                                                        <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-primary/30 transition-colors">
+                                                            <Input
+                                                                type="file"
+                                                                className="hidden"
+                                                                id="file-upload"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files[0];
+                                                                    if (file) { setUploadFile(file); setNewFileName(file.name); }
+                                                                }}
+                                                            />
+                                                            <label htmlFor="file-upload" className="cursor-pointer">
+                                                                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {uploadFile ? uploadFile.name : 'Click to select file'}
+                                                                </p>
+                                                            </label>
+                                                        </div>
+                                                    </TabsContent>
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium">Category</label>
+                                                        <Select value={newFileCategory} onValueChange={setNewFileCategory}>
+                                                            <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="Docs">Document</SelectItem>
+                                                                <SelectItem value="Mockups">Component</SelectItem>
+                                                                <SelectItem value="Assets">Asset</SelectItem>
+                                                                {(project?.custom_categories || []).map(cat => (
+                                                                    <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
                                                     </div>
-                                                </TabsContent>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium">Category</label>
-                                                    <Select value={newFileCategory} onValueChange={setNewFileCategory}>
-                                                        <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="Docs">Document</SelectItem>
-                                                            <SelectItem value="Mockups">Component</SelectItem>
-                                                            <SelectItem value="Assets">Asset</SelectItem>
-                                                            {(project?.custom_categories || []).map(cat => (
-                                                                <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <Button type="submit" className="w-full rounded-xl">Create</Button>
-                                            </form>
-                                        </Tabs>
-                                    </DialogContent>
-                                </Dialog>
-                            )}
+                                                    <Button type="submit" className="w-full rounded-xl">Create</Button>
+                                                </form>
+                                            </Tabs>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Content */}
-                <ScrollArea className="flex-1 pt-6">
-                    <div key={viewMode} className="animate-in fade-in duration-200">
+                <ScrollArea className={`flex-1 ${isMobile ? 'pt-4' : 'pt-6'}`}>
+                    <div key={viewMode} className="animate-in fade-in duration-200 pb-32">
                         {filteredFiles.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20">
                                 <div className="h-20 w-20 rounded-3xl bg-secondary/30 flex items-center justify-center mb-4">
@@ -451,11 +555,12 @@ export default function ProjectFiles() {
                                 )}
                             </div>
                         ) : viewMode === 'grid' ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                                 {filteredFiles.map(file => (
                                     <FileCard
                                         key={file.id}
                                         file={file}
+                                        isMobile={isMobile}
                                         onOpen={() => navigate(`${baseUrl}/editor/${file.id}`)}
                                         onPreview={() => setPreviewFile(file)}
                                         onPin={() => handleTogglePin(file)}
@@ -474,6 +579,7 @@ export default function ProjectFiles() {
                                     <FileListItem
                                         key={file.id}
                                         file={file}
+                                        isMobile={isMobile}
                                         onOpen={() => navigate(`${baseUrl}/editor/${file.id}`)}
                                         onPreview={() => setPreviewFile(file)}
                                         onPin={() => handleTogglePin(file)}
@@ -492,13 +598,13 @@ export default function ProjectFiles() {
 
                 {/* Preview Modal */}
                 <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-                    <DialogContent className="max-w-3xl h-[80vh] flex flex-col rounded-2xl">
-                        <DialogHeader>
+                    <DialogContent className={`${isMobile ? 'w-full h-full max-w-none rounded-none border-0 p-0 flex flex-col' : 'max-w-3xl h-[80vh] flex flex-col rounded-2xl'}`}>
+                        <DialogHeader className={isMobile ? 'p-4 border-b border-white/10 bg-black/40' : ''}>
                             <DialogTitle className="font-mono">{previewFile?.name}</DialogTitle>
                         </DialogHeader>
-                        <div className="flex-1 bg-black/50 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center">
+                        <div className={`flex-1 overflow-hidden flex items-center justify-center ${isMobile ? 'bg-black' : 'bg-black/50 rounded-xl border border-white/10'}`}>
                             {previewFile?.type === 'asset' && previewFile.content.startsWith('data:image') ? (
-                                <img src={previewFile.content} alt={previewFile.name} className="max-w-full max-h-full rounded-lg" />
+                                <img src={previewFile.content} alt={previewFile.name} className="max-w-full max-h-full rounded-lg object-contain" />
                             ) : isXmlFile(previewFile?.name) ? (
                                 <XmlPreviewCompact content={previewFile?.content || ''} fileName={previewFile?.name} />
                             ) : (
@@ -507,13 +613,13 @@ export default function ProjectFiles() {
                                 </pre>
                             )}
                         </div>
-                        <div className="flex justify-end gap-2 pt-2">
-                            <Button variant="outline" className="rounded-xl" onClick={() => setPreviewFile(null)}>Close</Button>
-                            <Button variant="secondary" className="rounded-xl" onClick={() => handleDownload(previewFile)}>
-                                <Download className="h-4 w-4 mr-2" /> Download
+                        <div className={`flex justify-end gap-2 flex-wrap ${isMobile ? 'p-4 border-t border-white/10 bg-black/40' : 'pt-2'}`}>
+                            <Button variant="outline" size={isMobile ? "sm" : "default"} className="rounded-xl" onClick={() => setPreviewFile(null)}>Close</Button>
+                            <Button variant="secondary" size={isMobile ? "sm" : "default"} className="rounded-xl" onClick={() => handleDownload(previewFile)}>
+                                <Download className="h-4 w-4 mr-2" /> {isMobile ? 'Download' : 'Download'}
                             </Button>
-                            <Button className="rounded-xl" onClick={() => { setPreviewFile(null); navigate(`${baseUrl}/editor/${previewFile.id}`); }}>
-                                <ExternalLink className="h-4 w-4 mr-2" /> Open Editor
+                            <Button size={isMobile ? "sm" : "default"} className="rounded-xl" onClick={() => { setPreviewFile(null); navigate(`${baseUrl}/editor/${previewFile.id}`); }}>
+                                <ExternalLink className="h-4 w-4 mr-2" /> {isMobile ? 'Open' : 'Open Editor'}
                             </Button>
                         </div>
                     </DialogContent>
@@ -527,7 +633,7 @@ export default function ProjectFiles() {
 // FILE CARD (Grid View)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function FileCard({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRename, onUpdateTags, getIcon, readOnly }) {
+function FileCard({ file, isMobile, onOpen, onPreview, onPin, onDownload, onDelete, onRename, onUpdateTags, getIcon, readOnly }) {
     const [isRenaming, setIsRenaming] = useState(false);
     const [nameValue, setNameValue] = useState(file.name);
     const [isAddingTag, setIsAddingTag] = useState(false);
@@ -570,22 +676,26 @@ function FileCard({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRena
                         </div>
                     )}
 
-                    {/* Quick Actions on hover */}
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onDownload(); }}
-                            className="p-1.5 rounded-lg bg-black/50 hover:bg-primary/80 transition-colors"
-                            title="Download"
-                        >
-                            <Download className="h-3.5 w-3.5 text-white" />
-                        </button>
-                        {!readOnly && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onPin(); }}
-                                className="p-1.5 rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
-                            >
-                                <Pin className={`h-3.5 w-3.5 ${file.pinned ? 'text-accent fill-accent' : 'text-white'}`} />
-                            </button>
+                    {/* Quick Actions - Always visible on mobile (dropdown only), hover on desktop */}
+                    <div className={`absolute top-2 right-2 flex gap-1 transition-opacity ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                        {!isMobile && (
+                            <>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onDownload(); }}
+                                    className="p-1.5 rounded-lg bg-black/50 hover:bg-primary/80 transition-colors"
+                                    title="Download"
+                                >
+                                    <Download className="h-3.5 w-3.5 text-white" />
+                                </button>
+                                {!readOnly && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onPin(); }}
+                                        className="p-1.5 rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
+                                    >
+                                        <Pin className={`h-3.5 w-3.5 ${file.pinned ? 'text-accent fill-accent' : 'text-white'}`} />
+                                    </button>
+                                )}
+                            </>
                         )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -605,6 +715,9 @@ function FileCard({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRena
                                 </DropdownMenuItem>
                                 {!readOnly && (
                                     <>
+                                        <DropdownMenuItem onClick={() => onPin()}>
+                                            <Pin className={`mr-2 h-4 w-4 ${file.pinned ? 'text-accent fill-accent' : ''}`} /> {file.pinned ? 'Unpin' : 'Pin'}
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setIsRenaming(true)}>
                                             <FileText className="mr-2 h-4 w-4" /> Rename
                                         </DropdownMenuItem>
@@ -622,14 +735,14 @@ function FileCard({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRena
                     {file.type === 'asset' && file.content.startsWith('data:image') ? (
                         <img src={file.content} alt={file.name} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="p-4 transition-transform duration-200 group-hover:scale-125">
+                        <div className={`p-4 transition-transform duration-200 ${!isMobile && 'group-hover:scale-125'}`}>
                             {getIcon(file.type, file.name)}
                         </div>
                     )}
                 </div>
 
                 {/* File info */}
-                <div className="p-3 border-t border-white/5">
+                <div className="p-4 border-t border-white/5">
                     {isRenaming ? (
                         <div className="flex items-center gap-1">
                             <Input
@@ -709,7 +822,7 @@ function FileCard({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRena
 // FILE LIST ITEM (List View)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function FileListItem({ file, onOpen, onPreview, onPin, onDownload, onDelete, onRename, onUpdateTags, getIcon, readOnly }) {
+function FileListItem({ file, isMobile, onOpen, onPreview, onPin, onDownload, onDelete, onRename, onUpdateTags, getIcon, readOnly }) {
     const [isRenaming, setIsRenaming] = useState(false);
     const [nameValue, setNameValue] = useState(file.name);
     const [isAddingTag, setIsAddingTag] = useState(false);
@@ -735,10 +848,10 @@ function FileListItem({ file, onOpen, onPreview, onPin, onDownload, onDelete, on
     };
 
     return (
-        <div className={`flex items-center justify-between p-3 rounded-2xl bg-secondary/20 border border-white/10 hover:border-primary/30 transition-all group
+        <div className={`flex items-center justify-between p-4 rounded-2xl bg-secondary/20 border border-white/10 hover:border-primary/30 transition-all group
       ${file.pinned ? 'ring-2 ring-accent/30' : ''}`}>
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className="h-10 w-10 rounded-xl bg-secondary/50 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
+            <div className="flex items-center gap-5 flex-1 min-w-0">
+                <div className="h-12 w-12 rounded-2xl bg-secondary/50 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
                     {getIcon(file.type, file.name)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -766,11 +879,11 @@ function FileListItem({ file, onOpen, onPreview, onPin, onDownload, onDelete, on
                                 onClick={() => !readOnly && setIsRenaming(true)}
                                 title={readOnly ? file.name : "Click to rename"}
                             >
-                                {file.name}
-                                {file.pinned && <Pin className="h-3 w-3 text-accent fill-accent" />}
+                                <span className="truncate">{file.name}</span>
+                                {file.pinned && <Pin className="h-3 w-3 text-accent fill-accent flex-shrink-0" />}
                             </button>
-                            <div className="flex items-center gap-2">
-                                <p className="text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                                <p className="text-xs text-muted-foreground whitespace-nowrap">
                                     {file.category} · {formatDistanceToNow(new Date(file.last_edited))} ago
                                 </p>
                                 {/* Tags */}
@@ -778,7 +891,7 @@ function FileListItem({ file, onOpen, onPreview, onPin, onDownload, onDelete, on
                                     {(file.tags || []).map(tag => (
                                         <span
                                             key={tag}
-                                            className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-md bg-primary/20 text-primary border border-primary/30 group/tag"
+                                            className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-md bg-primary/20 text-primary border border-primary/30 group/tag whitespace-nowrap"
                                         >
                                             <Hash className="h-2 w-2" />
                                             {tag}
@@ -819,22 +932,59 @@ function FileListItem({ file, onOpen, onPreview, onPin, onDownload, onDelete, on
                     )}
                 </div>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onDownload} title="Download">
-                    <Download className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onPin}>
-                    <Pin className={`h-4 w-4 ${file.pinned ? 'text-accent fill-accent' : ''}`} />
-                </Button>
-                <Button variant="ghost" size="sm" className="rounded-lg" onClick={onPreview}>
-                    Preview
-                </Button>
-                <Button variant="secondary" size="sm" className="rounded-lg" onClick={onOpen}>
-                    Open
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-500/20 hover:text-red-500" onClick={onDelete}>
-                    <Trash2 className="h-4 w-4" />
-                </Button>
+            <div className={`flex items-center gap-1 transition-opacity ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                {isMobile ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem onClick={onOpen}>
+                                <ExternalLink className="mr-2 h-4 w-4" /> Open Editor
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onPreview}>
+                                <Eye className="mr-2 h-4 w-4" /> Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onDownload}>
+                                <Download className="mr-2 h-4 w-4" /> Download
+                            </DropdownMenuItem>
+                            {!readOnly && (
+                                <>
+                                    <DropdownMenuItem onClick={() => onPin()}>
+                                        <Pin className={`mr-2 h-4 w-4 ${file.pinned ? 'text-accent fill-accent' : ''}`} /> {file.pinned ? 'Unpin' : 'Pin'}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setIsRenaming(true)}>
+                                        <FileText className="mr-2 h-4 w-4" /> Rename
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-red-500" onClick={onDelete}>
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
+                    <>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onDownload} title="Download">
+                            <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onPin}>
+                            <Pin className={`h-4 w-4 ${file.pinned ? 'text-accent fill-accent' : ''}`} />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="rounded-lg" onClick={onPreview}>
+                            Preview
+                        </Button>
+                        <Button variant="secondary" size="sm" className="rounded-lg" onClick={onOpen}>
+                            Open
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-500/20 hover:text-red-500" onClick={onDelete}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </>
+                )}
             </div>
         </div>
     );

@@ -5,13 +5,29 @@ import FileBrowser from '../components/FileBrowser';
 import Editor from '../components/Editor';
 import Preview from '../components/Preview';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/ui/resizable';
-import { Upload, FileText, FileCode } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Upload, FileText, FileCode, ArrowLeft, Eye, Code as CodeIcon, PanelLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
 import { useProjectContext } from '../context/ProjectContext';
 import { useCreateFile, useUpdateFile, useDeleteFile } from '../hooks/useProjectQueries';
 
+// Hook to detect mobile viewport
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  return isMobile;
+};
+
 export default function Workspace() {
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState('files'); // 'files', 'editor', 'preview'
+
   const { projectId, fileId } = useParams();
   const navigate = useNavigate();
 
@@ -29,6 +45,13 @@ export default function Workspace() {
   const [project, setProject] = useState(null);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Update mobile view when activeFile changes
+  useEffect(() => {
+    if (isMobile && activeFile) {
+      setMobileView('editor');
+    }
+  }, [activeFile, isMobile]);
 
   // Track if we've synced from context
   const hasSynced = useRef(false);
@@ -267,6 +290,83 @@ export default function Workspace() {
       handleDropFiles(droppedFiles);
     }
   }, [projectId]);
+
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col bg-background overflow-hidden relative">
+        {/* Mobile Header */}
+        <header className="h-14 border-b border-white/5 flex items-center px-4 justify-between bg-black/50 backdrop-blur-xl shrink-0">
+          <div className="flex items-center gap-3 overflow-hidden">
+            {mobileView !== 'files' && (
+              <Button variant="ghost" size="icon" onClick={() => setMobileView('files')} className="-ml-2 h-9 w-9" title="Toggle Sidebar">
+                <PanelLeft className="h-5 w-5" />
+              </Button>
+            )}
+            <div className="min-w-0 flex flex-col">
+              <span className="font-mono font-bold text-sm truncate">
+                {mobileView === 'files' ? (project?.name || 'Files') : activeFile?.name}
+              </span>
+              {mobileView !== 'files' && activeFile && (
+                <span className="text-[10px] text-muted-foreground truncate">{activeFile.category || 'File'}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Toggle between Editor and Preview */}
+            {mobileView === 'editor' && activeFile && (
+              <Button size="sm" variant="ghost" onClick={() => setMobileView('preview')} className="h-8 px-2">
+                <Eye className="h-4 w-4 mr-2" /> Preview
+              </Button>
+            )}
+            {mobileView === 'preview' && (
+              <Button size="sm" variant="ghost" onClick={() => setMobileView('editor')} className="h-8 px-2">
+                <CodeIcon className="h-4 w-4 mr-2" /> Editor
+              </Button>
+            )}
+            {/* Save Indicator */}
+            <div className={`h-2 w-2 rounded-full ${saving ? 'bg-yellow-500' : 'bg-green-500'}`} />
+          </div>
+        </header>
+
+        {/* Mobile Content */}
+        <div className="flex-1 overflow-hidden relative">
+          {mobileView === 'files' && (
+            <FileBrowser
+              files={files}
+              activeFile={activeFile}
+              project={project}
+              onSelect={(file) => {
+                handleFileSelect(file);
+                setMobileView('editor');
+              }}
+              onCreate={handleCreateFile}
+              onDelete={handleDeleteFile}
+              onUpdateFile={handleUpdateFile}
+              onUpdateProject={handleUpdateProject}
+              onDropFiles={handleDropFiles}
+              readOnly={readOnly}
+            />
+          )}
+          {mobileView === 'editor' && activeFile && (
+            <Editor
+              file={activeFile}
+              onChange={handleContentChange}
+              readOnly={readOnly}
+            />
+          )}
+          {mobileView === 'preview' && activeFile && (
+            <Preview file={activeFile} projectId={projectId} />
+          )}
+          {!activeFile && mobileView !== 'files' && (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <p>No file selected</p>
+              <Button variant="link" onClick={() => setMobileView('files')}>Go to Files</Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -303,17 +303,17 @@ export default function ProjectHome() {
                     {/* Current Focus */}
                     <div className="lg:col-span-8">
                         {stats.nextTask ? (
-                            <div className="rounded-2xl bg-secondary/30 border border-accent/20 p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-10 w-10 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center">
-                                        <Target className="h-5 w-5 text-accent" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-medium text-accent uppercase tracking-wider">Current Focus</p>
-                                        <h3 className="text-base font-semibold truncate max-w-[350px]">{stats.nextTask.title}</h3>
-                                    </div>
+                            <div className="rounded-2xl bg-secondary/30 border border-accent/20 p-4 flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                                <div className="h-10 w-10 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center flex-shrink-0">
+                                    <Target className="h-5 w-5 text-accent" />
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-medium text-accent uppercase tracking-wider">Current Focus</p>
+                                    <h3 className="text-base font-semibold truncate max-w-[200px] md:max-w-[350px]">{stats.nextTask.title}</h3>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
                                     <Button size="sm" variant="ghost" className="rounded-xl border border-white/10" onClick={() => navigate(`${baseUrl}/tasks`)}>
                                         View
                                     </Button>

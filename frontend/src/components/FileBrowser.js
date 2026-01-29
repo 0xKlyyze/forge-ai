@@ -355,7 +355,7 @@ export default function FileBrowser({
 
       {/* File List */}
       <ScrollArea className="flex-1">
-        <Accordion type="multiple" defaultValue={['Mockups', 'Docs']} className="w-full">
+        <Accordion type="multiple" defaultValue={['Mockups', 'Docs']} className="w-full pb-24">
           {allCategories.map(category => {
             const categoryFiles = files.filter(f => f.category === category.id);
             return (
@@ -406,7 +406,7 @@ export default function FileBrowser({
 
                         {/* Quick actions */}
                         {!renamingFileId && !readOnly && (
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <div className="flex items-center gap-0.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0">
                             {/* Rename */}
                             <Button
                               variant="ghost"

@@ -2159,7 +2159,7 @@ export default function ProjectChat() {
                     )}
 
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden" ref={scrollRef}>
                         <div className={`mx-auto p-4 ${isMobile ? 'pt-4 px-3 pb-32' : 'pt-14 pb-40'} space-y-6 transition-all duration-300 ${(editorPanelOpen || mockupPanelOpen) && !isMobile ? 'max-w-2xl' : 'max-w-4xl'}`}>
                             {/* Welcome State - Only show for authenticated users, not in read-only demo mode */}
                             {messages.length === 0 && !loading && !readOnly && (
@@ -2887,11 +2887,11 @@ function MessageBubble({ message, messageIndex, files = [], tasks = [], projectI
             )}
 
             <div className={`
-                rounded-2xl p-4 text-sm leading-relaxed
+                rounded-2xl p-4 text-sm leading-relaxed break-words
                 ${isUser
-                    ? 'bg-primary text-primary-foreground rounded-tr-md'
-                    : 'bg-secondary/40 border border-white/5 rounded-tl-md backdrop-blur-md'}
-                max-w-[85%] md:max-w-[75%]
+                    ? 'bg-primary text-primary-foreground rounded-tr-md max-w-[85%]'
+                    : 'bg-secondary/40 border border-white/5 rounded-tl-md backdrop-blur-md max-w-[70%]'}
+                md:max-w-[75%]
             `}>
                 {/* Attachments Display - Images and Files */}
                 {isUser && message.attachments && message.attachments.length > 0 && (

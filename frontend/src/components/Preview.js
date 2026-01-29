@@ -9,10 +9,17 @@ import {
 import { atomDark } from "@codesandbox/sandpack-themes";
 import {
   Maximize2, Minimize2, Monitor, Tablet, Smartphone,
-  RotateCcw, Minus, Plus
+  RotateCcw, Minus, Plus, ChevronDown, Check
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent } from '../components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+  RotateCcw, Minus, Plus
 import { Slider } from '../components/ui/slider';
 import XmlViewer from '../components/XmlViewer';
 
@@ -120,111 +127,165 @@ export default function Preview({ file, projectId }) {
   if (!file) return null;
 
   // Zoom Toolbar Component
-  const ZoomToolbar = ({ isFullscreenMode = false }) => (
-    <div className="flex items-center gap-2 px-3 py-2 bg-black/80 backdrop-blur-xl border-b border-white/10 flex-shrink-0">
-      {/* Device Presets */}
-      <div className="flex items-center gap-1 border-r border-white/10 pr-3 mr-1">
-        {DEVICE_PRESETS.map(device => (
-          <button
-            key={device.id}
-            onClick={() => handleDeviceChange(device.id)}
-            className={`p-1.5 rounded-lg transition-all ${devicePreset === device.id
-              ? 'bg-primary/20 text-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
-            title={device.label}
-          >
-            <device.icon className="h-4 w-4" />
-          </button>
-        ))}
-        {currentDevice?.width && (
-          <span className="text-xs text-muted-foreground font-mono ml-1">
-            {currentDevice.width}px
-          </span>
-        )}
-      </div>
+  const ZoomToolbar = ({ isFullscreenMode = false }) => {
+    const CurrentDeviceIcon = currentDevice?.icon || Monitor;
 
-      {/* Zoom Controls */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleZoomOut}
-          disabled={zoom <= 25}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          title="Zoom out"
-        >
-          <Minus className="h-4 w-4" />
-        </button>
-
-        <div className="flex items-center gap-2 min-w-[140px]">
-          <Slider
-            value={[zoom]}
-            onValueChange={([val]) => handleZoomChange(val)}
-            min={25}
-            max={200}
-            step={5}
-            className="w-20"
-          />
-          <span className="text-xs text-muted-foreground font-mono w-10 text-center">
-            {zoom}%
-          </span>
+    return (
+      <div className="flex items-center justify-between px-3 py-2 bg-black/80 backdrop-blur-xl border-b border-white/10 flex-shrink-0 gap-2 overflow-x-auto scrollbar-hide">
+        {/* Device Dropdown - Flex-1 on mobile to fill space */}
+        <div className="flex-1 md:flex-none md:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 w-full justify-start gap-2 px-2 text-muted-foreground hover:text-foreground border border-white/5 bg-white/5">
+                <CurrentDeviceIcon className="h-4 w-4" />
+                <span className="truncate">{currentDevice?.label || 'Responsive'}</span>
+                <ChevronDown className="h-3 w-3 opacity-50 ml-auto" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="bg-[#111] border-white/10 w-[200px]">
+              {DEVICE_PRESETS.map(device => (
+                <DropdownMenuItem
+                  key={device.id}
+                  onClick={() => handleDeviceChange(device.id)}
+                  className="gap-2 focus:bg-white/10 focus:text-white cursor-pointer"
+                >
+                  <device.icon className="h-4 w-4" />
+                  <span>{device.label}</span>
+                  {devicePreset === device.id && <Check className="h-3 w-3 ml-auto text-primary" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <button
-          onClick={handleZoomIn}
-          disabled={zoom >= 200}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          title="Zoom in"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
+        {/* Desktop: Device Icons Row */}
+        <div className="hidden md:flex items-center gap-1 border-r border-white/10 pr-3 mr-1">
+          {DEVICE_PRESETS.map(device => (
+            <button
+              key={device.id}
+              onClick={() => handleDeviceChange(device.id)}
+              className={`p-1.5 rounded-lg transition-all ${devicePreset === device.id
+                ? 'bg-primary/20 text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                }`}
+              title={device.label}
+            >
+              <device.icon className="h-4 w-4" />
+            </button>
+          ))}
+          {currentDevice?.width && (
+            <span className="text-xs text-muted-foreground font-mono ml-1">
+              {currentDevice.width}px
+            </span>
+          )}
+        </div>
 
-      {/* Zoom Presets */}
-      <div className="flex items-center gap-1 border-l border-white/10 pl-3 ml-1">
-        {[50, 100, 150].map(preset => (
-          <button
-            key={preset}
-            onClick={() => handleZoomChange(preset)}
-            className={`px-2 py-1 rounded-md text-xs font-mono transition-all ${zoom === preset
-              ? 'bg-primary/20 text-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
-          >
-            {preset}%
-          </button>
-        ))}
-      </div>
+        <div className="flex items-center gap-2">
+          {/* Mobile: Compact Zoom Controls - Larger Touch Targets */}
+          <div className="flex md:hidden items-center bg-white/5 rounded-lg p-0.5 border border-white/5">
+            <button
+              onClick={handleZoomOut}
+              disabled={zoom <= 25}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 disabled:opacity-30 transition-all active:bg-white/10"
+              title="Zoom out"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="text-xs text-muted-foreground font-mono w-10 text-center select-none font-medium">
+              {zoom}%
+            </span>
+            <button
+              onClick={handleZoomIn}
+              disabled={zoom >= 200}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 disabled:opacity-30 transition-all active:bg-white/10"
+              title="Zoom in"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
 
-      {/* Refresh & Fullscreen */}
-      <div className="flex items-center gap-1 border-l border-white/10 pl-3 ml-auto">
-        <button
-          onClick={handleRefresh}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
-          title="Refresh preview"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
-        {!isFullscreenMode && (
-          <button
-            onClick={() => setIsFullscreen(true)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
-            title="Fullscreen"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-        )}
-        {isFullscreenMode && (
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
-            title="Exit fullscreen"
-          >
-            <Minimize2 className="h-4 w-4" />
-          </button>
-        )}
+          {/* Desktop: Expanded Zoom Controls */}
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              onClick={handleZoomOut}
+              disabled={zoom <= 25}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              title="Zoom out"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-2 min-w-[140px]">
+              <Slider
+                value={[zoom]}
+                onValueChange={([val]) => handleZoomChange(val)}
+                min={25}
+                max={200}
+                step={5}
+                className="w-20"
+              />
+              <span className="text-xs text-muted-foreground font-mono w-10 text-center">
+                {zoom}%
+              </span>
+            </div>
+
+            <button
+              onClick={handleZoomIn}
+              disabled={zoom >= 200}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              title="Zoom in"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Desktop: Zoom Presets */}
+          <div className="hidden md:flex items-center gap-1 border-l border-white/10 pl-3 ml-1">
+            {[50, 100, 150].map(preset => (
+              <button
+                key={preset}
+                onClick={() => handleZoomChange(preset)}
+                className={`px-2 py-1 rounded-md text-xs font-mono transition-all ${zoom === preset
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  }`}
+              >
+                {preset}%
+              </button>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 pl-1 md:border-l md:border-white/10 md:pl-2">
+            <button
+              onClick={handleRefresh}
+              className="p-2 md:p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all active:bg-white/10"
+              title="Refresh preview"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+            {!isFullscreenMode ? (
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="p-2 md:p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all active:bg-white/10"
+                title="Fullscreen"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="p-2 md:p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all active:bg-white/10"
+                title="Exit fullscreen"
+              >
+                <Minimize2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Calculate frame dimensions - frame stays fixed, content zooms inside
   const getFrameStyle = () => {
