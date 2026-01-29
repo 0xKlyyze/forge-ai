@@ -18,9 +18,22 @@ import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
 import { useProjectContext } from '../../context/ProjectContext';
 import { format } from 'date-fns';
 
+// Hook to detect mobile viewport
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  return isMobile;
+};
+
 export default function ProjectSettings() {
   const { projectId } = useParams();
   const { files } = useProjectContext();
+  const isMobile = useIsMobile();
   const [project, setProject] = useState(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
@@ -269,11 +282,11 @@ export default function ProjectSettings() {
       </aside>
 
       {/* Settings Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 pb-24 md:pb-6">
+      <main className={`flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 ${isMobile ? 'pb-32' : 'pb-6'}`}>
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight capitalize">{activeSection.replace('-', ' ')} Settings</h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -281,7 +294,7 @@ export default function ProjectSettings() {
               </p>
             </div>
             {activeSection === 'general' && (
-              <Button onClick={handleUpdate} className="h-10 px-6 rounded-xl shadow-lg shadow-primary/20 text-sm font-bold">
+              <Button onClick={handleUpdate} className="h-10 px-6 rounded-xl shadow-lg shadow-primary/20 text-sm font-bold w-full md:w-auto">
                 Save Changes
               </Button>
             )}
@@ -310,8 +323,8 @@ export default function ProjectSettings() {
 
                     <div className="space-y-3">
                       <Label>Project Icon</Label>
-                      <div className="flex items-center gap-6">
-                        <div className="h-28 w-28 rounded-3xl bg-secondary/30 border border-white/10 flex items-center justify-center overflow-hidden relative group shadow-2xl">
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="h-28 w-28 rounded-3xl bg-secondary/30 border border-white/10 flex items-center justify-center overflow-hidden relative group shadow-2xl shrink-0">
                           {icon ? (
                             <>
                               <img src={icon} alt="Icon" className="h-full w-full object-cover" />
@@ -352,13 +365,13 @@ export default function ProjectSettings() {
                 </Card>
 
                 {/* Additional Metadata Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-secondary/5 border border-white/5 space-y-1">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Fingerprint className="h-3.5 w-3.5" />
                       <span className="text-[10px] font-bold uppercase tracking-widest">Instance ID</span>
                     </div>
-                    <p className="font-mono text-xs">{projectId}</p>
+                    <p className="font-mono text-xs break-all">{projectId}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-secondary/5 border border-white/5 space-y-1">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -387,19 +400,19 @@ export default function ProjectSettings() {
                         <div className="grid gap-2">
                           {project.collaborators.map(collab => (
                             <div key={collab.id} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5 group hover:border-white/10 transition-colors">
-                              <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/20 shadow-inner">
-                                  <span className="text-sm font-bold text-primary">{collab.email?.charAt(0).toUpperCase()}</span>
+                                <div className="flex items-center gap-4">
+                                  <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/20 shadow-inner">
+                                    <span className="text-sm font-bold text-primary">{collab.email?.charAt(0).toUpperCase()}</span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">{collab.email}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Contributor</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="text-sm font-medium">{collab.email}</p>
-                                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Contributor</p>
-                                </div>
+                                <Button variant="ghost" size="icon" className={`h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} onClick={() => handleRemoveCollaborator(collab.id)}>
+                                  <Trash className="h-4 w-4" />
+                                </Button>
                               </div>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleRemoveCollaborator(collab.id)}>
-                                <Trash className="h-4 w-4" />
-                              </Button>
-                            </div>
                           ))}
                         </div>
                       ) : (
@@ -426,11 +439,11 @@ export default function ProjectSettings() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg" onClick={() => handleRetryInvite(email)} title="Resend Invite">
-                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg" onClick={() => handleRetryInvite(email)} title="Resend Invite">
+                                    <RefreshCw className="h-4 w-4" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg" onClick={() => handleCancelInvite(email)} title="Cancel Invite">
-                                    <X className="h-3.5 w-3.5" />
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg" onClick={() => handleCancelInvite(email)} title="Cancel Invite">
+                                    <X className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </div>
@@ -444,7 +457,7 @@ export default function ProjectSettings() {
                     <div className="pt-6 border-t border-white/5 space-y-4">
                       <div className="space-y-2">
                         <Label>Invite New Member</Label>
-                        <div className="flex gap-3 relative">
+                        <div className="flex flex-col md:flex-row gap-3 relative">
                           <div className="relative flex-1">
                             <Input
                               placeholder="colleague@example.com or @handle"
@@ -496,7 +509,7 @@ export default function ProjectSettings() {
                           <Button
                             onClick={handleInvite}
                             disabled={!inviteEmail}
-                            className="h-11 px-6 rounded-xl"
+                            className="h-11 px-6 rounded-xl w-full md:w-auto"
                           >
                             <Plus className="mr-2 h-4 w-4" /> Send Invite
                           </Button>
@@ -527,7 +540,7 @@ export default function ProjectSettings() {
                     <div className="space-y-6">
                       <div className="space-y-4">
                         <Label className="text-sm font-semibold">1. Visible Dashboard Pages</Label>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           {['home', 'tasks', 'files'].map(page => (
                             <div
                               key={page}
@@ -664,22 +677,22 @@ export default function ProjectSettings() {
                     <CardDescription>Once performed, these actions cannot be undone. Please proceed with extreme caution.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between p-6 bg-destructive/10 rounded-2xl border border-destructive/20 group">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-destructive/10 rounded-2xl border border-destructive/20 group gap-4">
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold">Delete this project</h4>
                         <p className="text-xs text-muted-foreground">Successfully deleting will remove all files, tasks, and data permanently.</p>
                       </div>
-                      <Button variant="destructive" className="px-6 rounded-xl hover:shadow-lg hover:shadow-destructive/20 transition-all">
+                      <Button variant="destructive" className="px-6 rounded-xl hover:shadow-lg hover:shadow-destructive/20 transition-all w-full md:w-auto">
                         Delete Project
                       </Button>
                     </div>
 
-                    <div className="flex items-center justify-between p-6 bg-black/20 rounded-2xl border border-white/5">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-black/20 rounded-2xl border border-white/5 gap-4">
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold">Transfer Ownership</h4>
                         <p className="text-xs text-muted-foreground">Hand over this project to another team member.</p>
                       </div>
-                      <Button variant="outline" className="px-6 rounded-xl border-white/10 hover:bg-white/5 transition-all" disabled>
+                      <Button variant="outline" className="px-6 rounded-xl border-white/10 hover:bg-white/5 transition-all w-full md:w-auto" disabled>
                         Transfer
                       </Button>
                     </div>
